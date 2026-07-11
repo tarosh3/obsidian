@@ -29,47 +29,127 @@ status: reference-quality
 >
 > **Checkpoint 1 (~8-10 min) — `Board` + ONE piece type, no `Game` yet.**
 > ```go
+> type Position struct{ Row, Col int }
+>
+> func (p Position) InBounds() bool {
+>     return p.Row >= 0 && p.Row < 8 && p.Col >= 0 && p.Col < 8
+> }
+>
 > type Piece interface {
 >     Color() Color
 >     ValidMoves(board *Board, from Position) []Position
 > }
 >
+> type basePiece struct{ color Color }
+>
+> func (b basePiece) Color() Color { return b.color }
+>
 > type Rook struct{ basePiece }
+>
+> func NewRook(color Color) *Rook { return &Rook{basePiece{color}} }
 >
 > func (r *Rook) ValidMoves(board *Board, from Position) []Position {
 >     return slideMoves(board, from, r.color, []Position{{1, 0}, {-1, 0}, {0, 1}, {0, -1}})
 > }
-> ```
-> **Pattern used: none yet — but name where it's going.** Say out loud: *"I'm making `Piece` an interface now instead of a type-switch, because I know I'll need Bishop, Queen, Knight, King, Pawn to plug in the same way."* Get `Board.Get`/`Set` and one working `ValidMoves` call demoable first.
 >
-> **Checkpoint 2 (~10 min) — add 2 more piece types, proving the abstraction generalizes.**
+> type Board struct{ cells [8][8]Piece }
+>
+> func (b *Board) Get(pos Position) Piece    { return b.cells[pos.Row][pos.Col] }
+> func (b *Board) Set(pos Position, p Piece) { b.cells[pos.Row][pos.Col] = p }
+> ```
+> **Pattern used: none yet — but name where it's going.** Say out loud: *"I'm making `Piece` an interface now instead of a type-switch, because I know I'll need Bishop, Queen, Knight, King, Pawn to plug in the same way."* `slideMoves` itself comes next checkpoint — for now, place one `Rook` on the board and call `ValidMoves` directly to prove the wiring compiles.
+>
+> **Checkpoint 2 (~10 min) — the shared `slideMoves` helper + a second piece type, proving the abstraction generalizes.**
 > ```go
-> // Bishop and Queen reuse slideMoves — they differ only in WHICH
-> // directions they slide, not the sliding mechanics itself.
+> // slideMoves: walk each direction until the edge, a friendly piece,
+> // or a capture. Rook, Bishop, Queen ALL call this — they differ only
+> // in WHICH directions they pass in, not the sliding mechanics itself.
+> func slideMoves(board *Board, from Position, color Color, directions []Position) []Position {
+>     var moves []Position
+>     for _, d := range directions {
+>         pos := Position{from.Row + d.Row, from.Col + d.Col}
+>         for pos.InBounds() {
+>             occupant := board.Get(pos)
+>             if occupant == nil {
+>                 moves = append(moves, pos)
+>             } else {
+>                 if occupant.Color() != color {
+>                     moves = append(moves, pos) // capture, then stop
+>                 }
+>                 break
+>             }
+>             pos = Position{pos.Row + d.Row, pos.Col + d.Col}
+>         }
+>     }
+>     return moves
+> }
+>
+> type Bishop struct{ basePiece }
+>
 > func (b *Bishop) ValidMoves(board *Board, from Position) []Position {
 >     return slideMoves(board, from, b.color, []Position{{1, 1}, {1, -1}, {-1, 1}, {-1, -1}})
 > }
 > ```
-> **Pattern used: polymorphism (structurally the same idea as Strategy elsewhere in this book) replacing a type-switch.** This is the checkpoint that actually proves the design — one shared `slideMoves` helper, zero duplicated sliding logic. Add Knight (fixed-offset jumps, genuinely different shape) if time allows, to show you handle more than one movement style.
+> **Pattern used: polymorphism (structurally the same idea as Strategy elsewhere in this book) replacing a type-switch.** This is the checkpoint that actually proves the design — one shared helper, zero duplicated sliding logic. Add Knight (fixed-offset jumps, genuinely different shape, Step 5) if time allows, to show you handle more than one movement style.
 >
-> **Checkpoint 3 (~8-10 min) — `Game` with turn management and basic legality.**
+> **Checkpoint 3 (~8-10 min) — `Game` with turn management and basic legality, fully wired.**
 > ```go
+> type Game struct {
+>     board       *Board
+>     currentTurn Color
+> }
+>
 > func (g *Game) Move(from, to Position) error {
 >     piece := g.board.Get(from)
+>     if piece == nil {
+>         return ErrNoPieceAtSource
+>     }
 >     if piece.Color() != g.currentTurn {
 >         return ErrNotYourTurn
 >     }
->     // check `to` is in piece.ValidMoves(...), then apply + flip turn
+>     legal := false
+>     for _, m := range piece.ValidMoves(g.board, from) {
+>         if m == to {
+>             legal = true
+>             break
+>         }
+>     }
+>     if !legal {
+>         return ErrIllegalMove
+>     }
+>     g.board.Set(to, piece)
+>     g.board.Set(from, nil)
+>     if g.currentTurn == White {
+>         g.currentTurn = Black
+>     } else {
+>         g.currentTurn = White
+>     }
+>     return nil
 > }
 > ```
-> **Pattern used: none new** — this wires the pieces from Checkpoints 1-2 into an actual playable sequence.
+> **Pattern used: none new** — this wires the pieces from Checkpoints 1-2 into an actual playable sequence. Self-check (does this move leave MY OWN king exposed) is deliberately deferred to Checkpoint 4.
 >
 > **Checkpoint 4 (remaining time, or if asked) — check detection, reusing existing move logic.**
 > ```go
 > // IsInCheck asks EVERY opposing piece for its own ValidMoves and
 > // checks if any lands on the king's square — reuses Piece.ValidMoves
 > // instead of building a separate, parallel "attack" system.
-> func (b *Board) IsInCheck(color Color) bool { /* Step 5 */ }
+> func (b *Board) IsInCheck(color Color) bool {
+>     kingPos := b.findKing(color)
+>     for r := 0; r < 8; r++ {
+>         for c := 0; c < 8; c++ {
+>             p := b.cells[r][c]
+>             if p != nil && p.Color() != color {
+>                 for _, move := range p.ValidMoves(b, Position{r, c}) {
+>                     if move == kingPos {
+>                         return true
+>                     }
+>                 }
+>             }
+>         }
+>     }
+>     return false
+> }
 > ```
 > This is the single best "aha" insight to state if you reach it: check detection isn't new logic, it's the *same* `ValidMoves` every piece already has, asked a different question. Castling/en passant/promotion should stay verbal-only (Step 4's Q&A) unless there's genuinely time left.
 >

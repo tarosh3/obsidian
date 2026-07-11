@@ -49,16 +49,71 @@ Create single or recurring events. Cancel/modify one occurrence without affectin
 >     IntervalDays int
 >     Until        time.Time
 > }
+>
+> func (r DailyRule) Occurrences(seriesStart, from, to time.Time) []time.Time {
+>     var result []time.Time
+>     cursor := seriesStart
+>     for !cursor.After(to) {
+>         if !r.Until.IsZero() && cursor.After(r.Until) {
+>             break
+>         }
+>         if !cursor.Before(from) {
+>             result = append(result, cursor)
+>         }
+>         cursor = cursor.AddDate(0, 0, r.IntervalDays)
+>     }
+>     return result
+> }
 > ```
 > **Pattern used: Strategy.** Get `DailyRule.Occurrences` correct — including the `Until` bound — before adding a second rule shape.
 >
 > **Checkpoint 4 (~10 min) — `WeeklyOnDaysRule` + per-occurrence exceptions. This is the checkpoint with the real signal.**
 > ```go
+> type WeeklyOnDaysRule struct {
+>     Weekdays []time.Weekday
+>     Until    time.Time
+> }
+>
+> func (r WeeklyOnDaysRule) Occurrences(seriesStart, from, to time.Time) []time.Time {
+>     weekdaySet := make(map[time.Weekday]bool)
+>     for _, d := range r.Weekdays {
+>         weekdaySet[d] = true
+>     }
+>     var result []time.Time
+>     cursor := seriesStart
+>     for !cursor.After(to) {
+>         if !r.Until.IsZero() && cursor.After(r.Until) {
+>             break
+>         }
+>         if !cursor.Before(from) && weekdaySet[cursor.Weekday()] {
+>             result = append(result, cursor)
+>         }
+>         cursor = cursor.AddDate(0, 0, 1)
+>     }
+>     return result
+> }
+>
 > // exceptions is keyed by Unix() timestamp, NOT time.Time itself.
-> exceptions map[int64]bool
+> type Event struct {
+>     Rule       RecurrenceRule
+>     exceptions map[int64]bool
+> }
 >
 > func (e *Event) CancelOccurrence(date time.Time) {
 >     e.exceptions[date.Unix()] = true
+> }
+>
+> // Occurrences delegates expansion entirely to Rule, then filters
+> // cancelled exceptions uniformly regardless of which Rule produced them.
+> func (e *Event) Occurrences(from, to time.Time) []time.Time {
+>     raw := e.Rule.Occurrences(e.Start, from, to)
+>     var result []time.Time
+>     for _, occ := range raw {
+>         if !e.exceptions[occ.Unix()] {
+>             result = append(result, occ)
+>         }
+>     }
+>     return result
 > }
 > ```
 > **Say the `time.Time`-as-map-key gotcha unprompted:** two `time.Time` values for the same instant can compare unequal via `==` due to differing monotonic-clock readings or `*Location` pointers — keying by `.Unix()` sidesteps it entirely. This single detail is worth more than most of the rest of the chapter combined if you can state it without being asked.

@@ -27,7 +27,7 @@ Support swapping the underlying algorithm (token bucket for one API, a stricter 
 > [!example]+ 🪜 How to build this live, step by step (interview execution order, with code)
 > This is a shorter problem than most LLD questions — you can afford to build the "wrong" version deliberately before refactoring.
 >
-> **Checkpoint 1 (~10-12 min) — one algorithm, hardcoded, no interface.** This is exactly the bad draft in Step 3 below: token bucket logic baked directly into `RateLimiter.Allow`. Get it fully correct and running first — token bucket alone, with refill math working — before thinking about a second algorithm at all.
+> **Checkpoint 1 (~10-12 min) — one algorithm, hardcoded, no interface. Get it fully correct before thinking about a second algorithm at all.**
 > ```go
 > type RateLimiter struct {
 >     mu       sync.Mutex
@@ -35,7 +35,29 @@ Support swapping the underlying algorithm (token bucket for one API, a stricter 
 >     rate     float64
 >     capacity float64
 > }
-> // Allow(clientID) checks/refills/decrements one bucket — see Step 3.
+>
+> type bucket struct {
+>     tokens     float64
+>     lastRefill time.Time
+> }
+>
+> func (r *RateLimiter) Allow(clientID string) bool {
+>     r.mu.Lock()
+>     defer r.mu.Unlock()
+>     b, ok := r.buckets[clientID]
+>     if !ok {
+>         b = &bucket{tokens: r.capacity, lastRefill: time.Now()}
+>         r.buckets[clientID] = b
+>     }
+>     elapsed := time.Since(b.lastRefill).Seconds()
+>     b.tokens = math.Min(r.capacity, b.tokens+elapsed*r.rate)
+>     b.lastRefill = time.Now()
+>     if b.tokens < 1 {
+>         return false
+>     }
+>     b.tokens--
+>     return true
+> }
 > ```
 > **Pattern used: none.** A single, correct algorithm beats a half-built interface with two broken implementations behind it.
 >
@@ -47,17 +69,88 @@ Support swapping the underlying algorithm (token bucket for one API, a stricter 
 >     Allow(clientID string) bool
 > }
 >
+> // TokenBucketStrategy — Checkpoint 1's Allow logic, unchanged, now
+> // behind the interface.
+> type TokenBucketStrategy struct {
+>     mu       sync.Mutex
+>     rate     float64
+>     capacity float64
+>     buckets  map[string]*bucket
+> }
+>
+> func (t *TokenBucketStrategy) Allow(clientID string) bool {
+>     t.mu.Lock()
+>     defer t.mu.Unlock()
+>     b, ok := t.buckets[clientID]
+>     if !ok {
+>         b = &bucket{tokens: t.capacity, lastRefill: time.Now()}
+>         t.buckets[clientID] = b
+>     }
+>     elapsed := time.Since(b.lastRefill).Seconds()
+>     b.tokens = math.Min(t.capacity, b.tokens+elapsed*t.rate)
+>     b.lastRefill = time.Now()
+>     if b.tokens < 1 {
+>         return false
+>     }
+>     b.tokens--
+>     return true
+> }
+>
+> // RateLimiter — now a thin wrapper. Dependency Inversion: it depends
+> // on LimiterStrategy, never a concrete algorithm.
 > type RateLimiter struct {
->     strategy LimiterStrategy // now a thin wrapper — Dependency Inversion
+>     strategy LimiterStrategy
 > }
 >
 > func (r *RateLimiter) Allow(clientID string) bool {
 >     return r.strategy.Allow(clientID)
 > }
 > ```
-> **Pattern used: Strategy.** Move the Checkpoint 1 token-bucket code, unchanged in logic, into a `TokenBucketStrategy` that implements this interface.
+> **Pattern used: Strategy.**
 >
-> **Checkpoint 3 (~10 min) — implement the second algorithm.** Write `SlidingWindowCounterStrategy` (full version in Step 6) — same interface, genuinely different math (weights the previous window's count instead of a raw timestamp log).
+> **Checkpoint 3 (~10 min) — implement the second algorithm.**
+> ```go
+> // SlidingWindowCounterStrategy — same interface, genuinely different
+> // math: weights the previous window's count by how much of it still
+> // "overlaps" now, instead of storing a raw per-request timestamp log.
+> type SlidingWindowCounterStrategy struct {
+>     mu         sync.Mutex
+>     limit      int
+>     windowSize time.Duration
+>     counters   map[string]*windowCounter
+> }
+>
+> type windowCounter struct {
+>     currentWindowStart time.Time
+>     currentCount       int
+>     previousCount      int
+> }
+>
+> func (s *SlidingWindowCounterStrategy) Allow(clientID string) bool {
+>     s.mu.Lock()
+>     defer s.mu.Unlock()
+>     now := time.Now()
+>     wc, ok := s.counters[clientID]
+>     if !ok {
+>         wc = &windowCounter{currentWindowStart: now}
+>         s.counters[clientID] = wc
+>     }
+>     elapsed := now.Sub(wc.currentWindowStart)
+>     if elapsed >= s.windowSize {
+>         wc.previousCount = wc.currentCount
+>         wc.currentCount = 0
+>         wc.currentWindowStart = now
+>         elapsed = 0
+>     }
+>     fraction := float64(elapsed) / float64(s.windowSize)
+>     weighted := float64(wc.previousCount)*(1-fraction) + float64(wc.currentCount)
+>     if weighted >= float64(s.limit) {
+>         return false
+>     }
+>     wc.currentCount++
+>     return true
+> }
+> ```
 >
 > **Checkpoint 4 (remaining time, or if asked) — the distributed jump.** No new code needed — describe verbally: the `map[string]*bucket` here is local, in-process memory; [[HLD/02 - Design a Rate Limiter/Design a Rate Limiter|the HLD chapter]] replaces it with Redis state and turns the check-refill-decrement sequence into one atomic Lua script, since multiple *servers* (not just goroutines) can now race on the same client's bucket.
 >

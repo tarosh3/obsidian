@@ -57,8 +57,30 @@ Users join a chat room. A sent message reaches all other members. Users shouldn'
 > func (u *User) Send(message string) {
 >     u.mediator.SendMessage(u, message)
 > }
+>
+> func (u *User) Receive(from *User, message string) {
+>     fmt.Printf("[%s received from %s]: %s\n", u.Name, from.Name, message)
+> }
+>
+> // ChatRoom — the concrete Mediator. Decides how a message reaches
+> // every other member; no User needs to know how many exist.
+> type ChatRoom struct {
+>     members []*User
+> }
+>
+> func (r *ChatRoom) Join(user *User) {
+>     r.members = append(r.members, user)
+> }
+>
+> func (r *ChatRoom) SendMessage(from *User, message string) {
+>     for _, m := range r.members {
+>         if m != from {
+>             m.Receive(from, message)
+>         }
+>     }
+> }
 > ```
-> **Pattern used: Mediator.** This is the checkpoint that matters — get `ChatRoom.Join` and `ChatRoom.SendMessage` (looping its own member list, excluding the sender) working for 3 users before anything else.
+> **Pattern used: Mediator.** This is the checkpoint that matters — `ChatRoom.Join` and `ChatRoom.SendMessage` (looping its own member list, excluding the sender), fully working for 3 users before anything else.
 >
 > **Checkpoint 3 (~5 min) — prove it with 3 users, one message.** Join Alice/Bob/Carol, `alice.Send(...)`, confirm Bob and Carol receive it and Alice doesn't. This is a cheap, convincing demo of the whole design.
 >

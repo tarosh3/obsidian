@@ -48,6 +48,7 @@ Join/leave a room. Per-participant mute/video state. Broadcast state changes to 
 > }
 >
 > type Room struct {
+>     mu           sync.Mutex
 >     participants map[string]*Participant
 >     observers    []RoomObserver // owned per-Room, not shared globally
 > }
@@ -57,17 +58,41 @@ Join/leave a room. Per-participant mute/video state. Broadcast state changes to 
 >         o.OnRoomEvent(event)
 >     }
 > }
-> ```
-> **Pattern used: Observer (room-scoped variant).** Say explicitly how this differs from the Notification System chapter's single global `EventPublisher` — that's the single strongest thing to volunteer in this question.
 >
-> **Checkpoint 4 (remaining time, or if asked) — host-only `MuteAll`, permission check woven into the action.**
+> func (r *Room) Join(participantID string, isHost bool) {
+>     r.mu.Lock()
+>     r.participants[participantID] = &Participant{ID: participantID, IsHost: isHost}
+>     observersCopy := append([]RoomObserver{}, r.observers...)
+>     r.mu.Unlock()
+>
+>     notifyAll(observersCopy, RoomEvent{Type: ParticipantJoined, ParticipantID: participantID})
+> }
+> ```
+> **Pattern used: Observer (room-scoped variant).** Say explicitly how this differs from the Notification System chapter's single global `EventPublisher` — that's the single strongest thing to volunteer in this question. Copy the observer slice under lock, then notify AFTER releasing it — same safe pattern as the Notification System's `EventPublisher.Publish`.
+>
+> **Checkpoint 4 (remaining time, or if asked) — host-only `MuteAll`, permission check woven into the action, fully implemented.**
 > ```go
 > func (r *Room) MuteAll(requesterID string) error {
+>     r.mu.Lock()
 >     requester, ok := r.participants[requesterID]
 >     if !ok || !requester.IsHost {
+>         r.mu.Unlock()
 >         return ErrNotHost // permission check IS the first line, not bolted on after
 >     }
->     // mute everyone else, notify
+>     var events []RoomEvent
+>     for id, p := range r.participants {
+>         if id != requesterID {
+>             p.Muted = true
+>             events = append(events, RoomEvent{Type: MuteChanged, ParticipantID: id})
+>         }
+>     }
+>     observersCopy := append([]RoomObserver{}, r.observers...)
+>     r.mu.Unlock()
+>
+>     for _, e := range events {
+>         notifyAll(observersCopy, e)
+>     }
+>     return nil
 > }
 > ```
 > **No new pattern** — but this is the second real signal in the chapter: authorization living directly inside the action it guards, not as a separate middleware-style layer floating outside the object model.

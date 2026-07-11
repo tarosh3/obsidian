@@ -44,6 +44,23 @@ Multiple item types (books, DVDs, magazines) with different loan periods. Member
 >
 > **Checkpoint 2 (~8 min) — multiple item types, refactor into Factory.**
 > ```go
+> // LibraryItem — each concrete type owns its own loan period,
+> // replacing an item-type if/else chain.
+> type LibraryItem interface {
+>     Title() string
+>     LoanPeriod() time.Duration
+> }
+>
+> type Book struct{ title string }
+>
+> func (b *Book) Title() string             { return b.title }
+> func (b *Book) LoanPeriod() time.Duration { return 21 * 24 * time.Hour }
+>
+> type DVD struct{ title string }
+>
+> func (d *DVD) Title() string             { return d.title }
+> func (d *DVD) LoanPeriod() time.Duration { return 7 * 24 * time.Hour }
+>
 > // NewLibraryItem centralizes the type switch into ONE place — this
 > // is the deliberate exception to "avoid switches": the switch
 > // doesn't disappear, it gets concentrated here instead of scattered

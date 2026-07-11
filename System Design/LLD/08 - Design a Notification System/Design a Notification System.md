@@ -49,7 +49,20 @@ Multiple subscribers can care about the **same** event. Each notification may ne
 > ```
 > **Pattern used: Observer.** One event type, one observer that just prints — get this firing end-to-end before adding filtering or multiple channels.
 >
-> **Checkpoint 2 (~5 min) — a second observer, prove it fans out.** Subscribe a second `Observer` implementation, publish one event, confirm both fire. No new pattern — just proving Observer's actual payoff (many independent subscribers, zero coupling between them).
+> **Checkpoint 2 (~5 min) — a second observer, prove it fans out.**
+> ```go
+> type ConsoleObserver struct{ Name string }
+>
+> func (c *ConsoleObserver) OnEvent(event Event) {
+>     fmt.Printf("[%s] got event: %s\n", c.Name, event.Type)
+> }
+>
+> publisher.Subscribe(&ConsoleObserver{Name: "email-service"})
+> publisher.Subscribe(&ConsoleObserver{Name: "sms-service"})
+> publisher.Publish(Event{Type: NewComment})
+> // both fire — zero coupling between them
+> ```
+> No new pattern — just proving Observer's actual payoff (many independent subscribers, zero coupling between them).
 >
 > **Checkpoint 3 (~10 min) — add delivery filtering, once "respect do-not-disturb hours" comes up.**
 > ```go
@@ -60,6 +73,12 @@ Multiple subscribers can care about the **same** event. Each notification may ne
 >     ShouldDeliver(event Event) bool
 > }
 >
+> // FilterChain: an ordered SLICE, not a linked chain of node objects
+> // — the more idiomatic Go expression of the same intent.
+> type FilterChain struct {
+>     filters []DeliveryFilter
+> }
+>
 > func (c *FilterChain) ShouldDeliver(event Event) bool {
 >     for _, f := range c.filters {
 >         if !f.ShouldDeliver(event) {
@@ -68,10 +87,32 @@ Multiple subscribers can care about the **same** event. Each notification may ne
 >     }
 >     return true
 > }
-> ```
-> **Pattern used: Chain of Responsibility (first-rejection-stops variant) composed with Observer.** Say explicitly why this variant differs from the Logger chapter's — the two patterns solve genuinely different problems ("who's interested" vs. "should this specific delivery happen right now"), and Go's idiomatic expression here is a plain ordered slice, not a linked chain of node objects.
 >
-> **Checkpoint 4 (remaining time, or if asked) — wire a `ChannelObserver` combining both, add a second filter.** No new pattern — composition of what already exists.
+> type MuteFilter struct{ mutedTypes map[EventType]bool }
+>
+> func (f *MuteFilter) ShouldDeliver(event Event) bool {
+>     return !f.mutedTypes[event.Type]
+> }
+> ```
+> **Pattern used: Chain of Responsibility (first-rejection-stops variant) composed with Observer.** Say explicitly why this variant differs from the Logger chapter's — the two patterns solve genuinely different problems ("who's interested" vs. "should this specific delivery happen right now").
+>
+> **Checkpoint 4 (remaining time, or if asked) — wire a `ChannelObserver` combining both.**
+> ```go
+> // ChannelObserver composes Observer + the filter chain — a concrete
+> // Observer that delivers to one channel only after filters pass.
+> type ChannelObserver struct {
+>     channel Channel
+>     filters *FilterChain
+> }
+>
+> func (o *ChannelObserver) OnEvent(event Event) {
+>     if !o.filters.ShouldDeliver(event) {
+>         return
+>     }
+>     o.channel.Send(event)
+> }
+> ```
+> No new pattern — composition of what already exists.
 >
 > **If you're short on time:** stop after Checkpoint 2. A working Observer with multiple independent subscribers is a complete answer to "how do multiple parties get notified" — describe the filter chain verbally as how you'd add delivery rules on top.
 

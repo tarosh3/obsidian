@@ -53,21 +53,45 @@ Support multiple schedule *shapes* (fixed interval, daily at a specific time) wi
 > ```
 > **Pattern used: Strategy.** Add `DailyAtSchedule` as a second implementation once this compiles — same interface, genuinely different computation.
 >
-> **Checkpoint 3 (~8 min) — Observer for outcomes.**
+> **Checkpoint 3 (~8 min) — Observer for outcomes, fully wired.**
 > ```go
 > type TaskObserver interface {
 >     OnSuccess(taskName string)
 >     OnFailure(taskName string, err error)
+> }
+>
+> func (s *Scheduler) runTask(t *Task, observers []TaskObserver) {
+>     err := t.Run()
+>     for _, o := range observers {
+>         if err != nil {
+>             o.OnFailure(t.Name, err)
+>         } else {
+>             o.OnSuccess(t.Name)
+>         }
+>     }
 > }
 > ```
 > **Pattern used: Observer.** Scheduler and Task never know what an observer does with a result — log it, page someone, increment a metric.
 >
 > **Checkpoint 4 (remaining time — this is the actual correctness point) — one goroutine per due task.**
 > ```go
-> // Each due task runs in its OWN goroutine — a slow task must never
-> // block the loop from checking/triggering OTHER tasks.
-> for _, t := range due {
->     go s.runTask(t, observersCopy)
+> func (s *Scheduler) checkAndRunDueTasks(now time.Time) {
+>     s.mu.Lock()
+>     var due []*Task
+>     for _, t := range s.tasks {
+>         if !now.Before(t.nextRun) {
+>             due = append(due, t)
+>             t.nextRun = t.Schedule.NextRunTime(now)
+>         }
+>     }
+>     observersCopy := append([]TaskObserver{}, s.observers...)
+>     s.mu.Unlock()
+>
+>     // Each due task runs in its OWN goroutine — a slow task must
+>     // never block the loop from checking/triggering OTHER tasks.
+>     for _, t := range due {
+>         go s.runTask(t, observersCopy)
+>     }
 > }
 > ```
 > **No new pattern — pure concurrency correctness.** Say explicitly why this matters: without it, a 10-second task delays every other task's due-check for those same 10 seconds if the scheduler's tick interval is, say, 1 second.

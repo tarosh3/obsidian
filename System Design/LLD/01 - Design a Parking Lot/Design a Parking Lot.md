@@ -77,7 +77,7 @@ status: reference-quality
 > ```
 > **Pattern used: still none.** Say out loud what you're feeling: *"this if/else is going to grow every time we add a vehicle type or a new pricing rule — I'd want to pull this behind an interface."* Naming the pain before fixing it is a stronger signal than declaring a pattern with no felt problem behind it.
 >
-> **Checkpoint 3 (~10-15 min) — refactor into Strategy.** Now introduce the interface:
+> **Checkpoint 3 (~10-15 min) — refactor into Strategy + Factory, fully wired.**
 > ```go
 > // PricingStrategy — the Strategy pattern. ParkingLot will depend on
 > // THIS, never on a concrete pricing struct.
@@ -88,21 +88,91 @@ status: reference-quality
 > type HourlyPricingStrategy struct{ RatePerHour float64 }
 >
 > func (h HourlyPricingStrategy) CalculateFee(d time.Duration) float64 {
->     return math.Ceil(d.Hours()) * h.RatePerHour
+>     hours := math.Ceil(d.Hours())
+>     if hours < 1 {
+>         hours = 1
+>     }
+>     return hours * h.RatePerHour
+> }
+>
+> // FirstHourFreeStrategy — a genuinely different SHAPE of computation
+> // from HourlyPricingStrategy, not just different numbers. This is
+> // exactly why pricing needed to be a Strategy, not a config value.
+> type FirstHourFreeStrategy struct{ RatePerHourAfterFirst float64 }
+>
+> func (f FirstHourFreeStrategy) CalculateFee(d time.Duration) float64 {
+>     if d <= time.Hour {
+>         return 0
+>     }
+>     billableHours := math.Ceil((d - time.Hour).Hours())
+>     return billableHours * f.RatePerHourAfterFirst
+> }
+>
+> // PricingStrategyFactory — Factory. ParkingLot.ExitVehicle calls
+> // StrategyFor and never branches on vehicle type itself again.
+> type PricingStrategyFactory struct {
+>     strategies map[VehicleType]PricingStrategy
+> }
+>
+> func NewPricingStrategyFactory() *PricingStrategyFactory {
+>     return &PricingStrategyFactory{
+>         strategies: map[VehicleType]PricingStrategy{
+>             Motorcycle: HourlyPricingStrategy{RatePerHour: 10},
+>             Car:        FirstHourFreeStrategy{RatePerHourAfterFirst: 20},
+>         },
+>     }
+> }
+>
+> func (f *PricingStrategyFactory) StrategyFor(vehicleType VehicleType) PricingStrategy {
+>     if strategy, ok := f.strategies[vehicleType]; ok {
+>         return strategy
+>     }
+>     return HourlyPricingStrategy{RatePerHour: 15} // unregistered type — conservative default, don't crash checkout
+> }
+>
+> // ParkingLot.ExitVehicle now delegates entirely — this is the payoff.
+> func (p *ParkingLot) ExitVehicle(ticketID string) (float64, error) {
+>     ticket, ok := p.activeTickets[ticketID]
+>     if !ok {
+>         return 0, ErrTicketNotFound
+>     }
+>     delete(p.activeTickets, ticketID)
+>
+>     strategy := p.pricingFactory.StrategyFor(ticket.Vehicle.Type())
+>     fee := strategy.CalculateFee(ticket.Duration())
+>     p.spotManager.Release(ticket.Spot)
+>     return fee, nil
 > }
 > ```
-> **Pattern used: Strategy.** One interface, one method, a small struct per pricing rule. Wire a `PricingStrategyFactory` (a second, smaller pattern — **Factory**) that maps `VehicleType -> PricingStrategy` so `ParkingLot` never branches on vehicle type again. Full multi-strategy implementation is in Step 9.
+> **Pattern used: Strategy + Factory.** Two pricing rules, fully working, selected by vehicle type — zero branching left in `ExitVehicle`. A third rule (`FlatDailyCapStrategy` for buses, Step 9) is the same shape again, worth mentioning rather than re-typing.
 >
-> **Checkpoint 4 (remaining time, or if asked) — concurrency.** Add a mutex so two vehicles can't claim the same spot:
+> **Checkpoint 4 (remaining time, or if asked) — concurrency, full atomic allocation.**
 > ```go
 > func (s *ParkingSpot) TryOccupy() bool {
 >     s.mu.Lock()
 >     defer s.mu.Unlock()
->     if s.Occupied {
+>     if s.Status == Occupied {
 >         return false
 >     }
->     s.Occupied = true
+>     s.Status = Occupied
 >     return true
+> }
+>
+> // SpotManager.Allocate — the manager-level lock serializes the
+> // find-then-claim sequence across floors; TryOccupy's own per-spot
+> // lock is defense-in-depth for any code path that touches a
+> // ParkingSpot directly, bypassing SpotManager.
+> func (sm *SpotManager) Allocate(size SpotSize) (*ParkingSpot, error) {
+>     sm.mu.Lock()
+>     defer sm.mu.Unlock()
+>     for _, floor := range sm.floors {
+>         if spot := floor.FindAvailableSpot(size); spot != nil {
+>             if spot.TryOccupy() {
+>                 return spot, nil
+>             }
+>         }
+>     }
+>     return nil, ErrNoSpotAvailable
 > }
 > ```
 > **No new pattern here** — just the thread-safety discipline every earlier checkpoint was missing. If asked, talk through reserved/VIP spots or time-of-day pricing as verbal extensions (Step 8).

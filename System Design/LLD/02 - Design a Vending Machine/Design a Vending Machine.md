@@ -49,9 +49,49 @@ status: reference-quality
 > ```
 > **Pattern used: none.** This runs end-to-end — insert a coin, select, get a result — in a handful of minutes. That's the point: a working toy beats a correct-looking `State` interface with nothing behind it.
 >
-> **Checkpoint 2 (~8-10 min) — real inventory, real states, still just string flags.** This is exactly the bad draft in Step 3 below: a `state string` field ("idle"/"hasMoney"/"dispensing"), `if v.state == "..."` guards scattered across `InsertCoin`, `SelectProduct`, and `Cancel`. Write it that way *deliberately* — you want to feel four methods each needing a new branch when "maintenance mode" gets mentioned, which is the exact motivating pain for the refactor.
+> **Checkpoint 2 (~8-10 min) — real inventory, real states, still just string flags.**
+> ```go
+> type VendingMachine struct {
+>     state           string // "idle", "hasMoney", "dispensing"
+>     balance         int
+>     selectedProduct string
+>     inventory       map[string]int
+> }
 >
-> **Checkpoint 3 (~10-15 min) — refactor into State.**
+> func (v *VendingMachine) InsertCoin(amount int) error {
+>     if v.state == "dispensing" {
+>         return errors.New("cannot insert coin while dispensing")
+>     }
+>     v.balance += amount
+>     if v.state == "idle" {
+>         v.state = "hasMoney"
+>     }
+>     return nil
+> }
+>
+> func (v *VendingMachine) SelectProduct(product string) error {
+>     if v.state != "hasMoney" {
+>         return errors.New("insert money first")
+>     }
+>     if v.inventory[product] <= 0 {
+>         return errors.New("out of stock")
+>     }
+>     v.state = "dispensing"
+>     return nil
+> }
+>
+> func (v *VendingMachine) Cancel() error {
+>     if v.state == "dispensing" {
+>         return errors.New("cannot cancel while dispensing")
+>     }
+>     v.state = "idle"
+>     v.balance = 0
+>     return nil
+> }
+> ```
+> **Pattern used: still none — write it this way deliberately.** You want to feel three methods each needing a new `if v.state == "maintenance"` branch when maintenance mode gets mentioned, which is the exact motivating pain for the refactor next.
+>
+> **Checkpoint 3 (~10-15 min) — refactor into State, all three states.**
 > ```go
 > // State — the State pattern. VendingMachine delegates every action
 > // to currentState instead of branching on a string field.
@@ -69,20 +109,79 @@ status: reference-quality
 >     m.setState(&HasMoneyState{})
 >     return nil
 > }
-> // SelectProduct/Dispense/Cancel all return ErrInvalidAction here —
-> // nothing else is legal while Idle.
-> ```
-> **Pattern used: State.** Write `IdleState` fully, then `HasMoneyState` and `DispensingState` (full versions in Step 9) — each owns only what's valid *in that state*, and `VendingMachine` stops branching on state entirely.
+> func (s *IdleState) SelectProduct(m *VendingMachine, code string) error { return ErrInvalidAction }
+> func (s *IdleState) Dispense(m *VendingMachine) error                  { return ErrInvalidAction }
+> func (s *IdleState) Cancel(m *VendingMachine) error                    { return ErrInvalidAction }
 >
-> **Checkpoint 4 (remaining time, or if asked) — maintenance mode + concurrency.**
+> type HasMoneyState struct{}
+>
+> func (s *HasMoneyState) InsertCoin(m *VendingMachine, amount int) error {
+>     m.balance += amount
+>     return nil
+> }
+> func (s *HasMoneyState) SelectProduct(m *VendingMachine, code string) error {
+>     product, ok := m.inventory.Get(code)
+>     if !ok {
+>         return ErrUnknownProduct
+>     }
+>     if !m.inventory.InStock(code) {
+>         return ErrOutOfStock
+>     }
+>     if m.balance < product.Price {
+>         return ErrInsufficientFunds
+>     }
+>     m.selectedProduct = code
+>     m.setState(&DispensingState{})
+>     return nil
+> }
+> func (s *HasMoneyState) Dispense(m *VendingMachine) error { return ErrInvalidAction }
+> func (s *HasMoneyState) Cancel(m *VendingMachine) error {
+>     m.refund()
+>     m.setState(&IdleState{})
+>     return nil
+> }
+>
+> type DispensingState struct{}
+>
+> func (s *DispensingState) InsertCoin(m *VendingMachine, amount int) error     { return ErrInvalidAction }
+> func (s *DispensingState) SelectProduct(m *VendingMachine, code string) error { return ErrInvalidAction }
+> func (s *DispensingState) Dispense(m *VendingMachine) error {
+>     product, _ := m.inventory.Get(m.selectedProduct)
+>     m.inventory.Decrement(m.selectedProduct)
+>     m.lastChange = m.balance - product.Price
+>     m.balance = 0
+>     m.selectedProduct = ""
+>     m.setState(&IdleState{})
+>     return nil
+> }
+> func (s *DispensingState) Cancel(m *VendingMachine) error { return ErrInvalidAction }
+> ```
+> **Pattern used: State.** All three states, fully working — `VendingMachine` stops branching on state entirely; every method above just delegates to `m.currentState`.
+>
+> **Checkpoint 4 (remaining time, or if asked) — maintenance mode + concurrency, fully wired.**
 > ```go
 > // Every action rejected — proves the refactor's payoff: zero
 > // changes to VendingMachine itself to add this.
 > type MaintenanceState struct{}
 >
-> func (s *MaintenanceState) InsertCoin(m *VendingMachine, amount int) error { return ErrUnderMaintenance }
+> func (s *MaintenanceState) InsertCoin(m *VendingMachine, amount int) error     { return ErrUnderMaintenance }
+> func (s *MaintenanceState) SelectProduct(m *VendingMachine, code string) error { return ErrUnderMaintenance }
+> func (s *MaintenanceState) Dispense(m *VendingMachine) error                   { return ErrUnderMaintenance }
+> func (s *MaintenanceState) Cancel(m *VendingMachine) error                     { return ErrUnderMaintenance }
+>
+> // A deliberate, privileged transition — bypasses the normal
+> // user-triggered action flow entirely.
+> func (m *VendingMachine) EnterMaintenance() { m.setState(&MaintenanceState{}) }
+>
+> // Concurrency: every public method acquires the same lock, so
+> // InsertCoin/SelectProduct/Dispense/Cancel all serialize correctly.
+> func (m *VendingMachine) InsertCoin(amount int) error {
+>     m.mu.Lock()
+>     defer m.mu.Unlock()
+>     return m.currentState.InsertCoin(m, amount)
+> }
 > ```
-> **No new pattern** — just one more `State` implementation, which is exactly the point to make out loud: this is what "closed for modification, open for extension" looks like in practice. Add the `sync.Mutex` from Step 9 if concurrency comes up.
+> **No new pattern** — just one more `State` implementation, which is exactly the point to make out loud: this is what "closed for modification, open for extension" looks like in practice.
 >
 > **If you're short on time:** stop after Checkpoint 2. You'll have a fully working machine (coins, selection, dispense, cancel, inventory, change) with the string-based state visible — describe the State refactor verbally as the next step and why it's needed.
 

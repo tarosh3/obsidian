@@ -62,9 +62,15 @@ status: reference-quality
 > **Checkpoint 3 (~10 min) — multi-seat hold, all-or-nothing.**
 > ```go
 > func (b *BookingService) HoldSeats(showID, userID string, seatIDs []string) error {
+>     show, ok := b.shows[showID]
+>     if !ok {
+>         return ErrShowNotFound
+>     }
+>     expiry := time.Now().Add(holdDuration)
 >     var held []string
 >     for _, seatID := range seatIDs {
->         if !show.Seats[seatID].TryHold(userID, expiry) {
+>         seat, ok := show.Seats[seatID]
+>         if !ok || !seat.TryHold(userID, expiry) {
 >             for _, heldID := range held {
 >                 show.Seats[heldID].Release(userID) // roll back partial holds
 >             }
@@ -75,9 +81,31 @@ status: reference-quality
 >     return nil
 > }
 > ```
-> This is the checkpoint most candidates skip — a user wanting 4 seats together shouldn't end up stuck holding 2 unusable ones. Full version in Step 8.
+> This is the checkpoint most candidates skip — a user wanting 4 seats together shouldn't end up stuck holding 2 unusable ones.
 >
-> **Checkpoint 4 (remaining time, or if asked) — hold expiry + confirm, then the distributed follow-up.** Add `expireIfNeeded` (lazy reclaim, Step 8) and `Confirm`. If pushed on multi-server deployment, say it verbally: this `sync.Mutex` only works within one process — a real distributed deployment needs the same atomic check-and-hold done via Redis + a Lua script instead (Step 7).
+> **Checkpoint 4 (remaining time, or if asked) — hold expiry + confirm.**
+> ```go
+> // expireIfNeeded lazily reclaims an expired hold on next access — no
+> // dedicated background timer goroutine per seat is required.
+> func (s *Seat) expireIfNeeded() {
+>     if s.Status == Held && time.Now().After(s.holdExpiry) {
+>         s.Status = Available
+>         s.heldBy = ""
+>     }
+> }
+>
+> func (s *Seat) Confirm(holderID string) bool {
+>     s.mu.Lock()
+>     defer s.mu.Unlock()
+>     s.expireIfNeeded()
+>     if s.Status != Held || s.heldBy != holderID {
+>         return false
+>     }
+>     s.Status = Booked
+>     return true
+> }
+> ```
+> If pushed on multi-server deployment, say it verbally: this `sync.Mutex` only works within one process — a real distributed deployment needs the same atomic check-and-hold done via Redis + a Lua script instead (Step 7).
 >
 > **If you're short on time:** stop after Checkpoint 2. A single seat with a correctly fixed race condition, demonstrated with the concurrent test in Step 8's `main.go`, is the actual core of this question — multi-seat holding and expiry are real but secondary extensions.
 

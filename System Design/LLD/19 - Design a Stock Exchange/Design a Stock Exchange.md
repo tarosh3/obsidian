@@ -57,18 +57,42 @@ Submit a limit buy or sell order (price + quantity). Match against the opposite 
 > ```
 > Multiple resting orders at the same price now fill in arrival order — this is a real, easy-to-get-wrong detail worth calling out explicitly.
 >
-> **Checkpoint 3 (~10-12 min) — sorted price levels (price priority) + the real matching loop.**
+> **Checkpoint 3 (~10-12 min) — sorted price levels (price priority) + the real matching loop, fully implemented.**
 > ```go
-> // bids sorted DESCENDING (best/highest first), asks ASCENDING
-> // (best/lowest first). This ordering + FIFO per level IS price-time priority.
+> type OrderBook struct {
+>     bids []*PriceLevel // sorted DESCENDING — best/highest first
+>     asks []*PriceLevel // sorted ASCENDING — best/lowest first
+> }
+>
+> // This ordering + FIFO per level IS price-time priority.
 > func (b *OrderBook) matchBuy(buyOrder *Order) []Trade {
+>     var trades []Trade
 >     for buyOrder.Remaining() > 0 && len(b.asks) > 0 {
 >         best := b.asks[0]
 >         if best.Price > buyOrder.Price {
 >             break // sorted ascending — nothing further out qualifies either
 >         }
->         // drain best.Orders FIFO, computing qty = min(remaining, remaining)
+>
+>         for len(best.Orders) > 0 && buyOrder.Remaining() > 0 {
+>             sellOrder := best.Orders[0] // FIFO — oldest resting order fills first
+>             qty := min64(buyOrder.Remaining(), sellOrder.Remaining())
+>
+>             buyOrder.Filled += qty
+>             sellOrder.Filled += qty
+>             trades = append(trades, Trade{
+>                 BuyOrderID: buyOrder.ID, SellOrderID: sellOrder.ID,
+>                 Price: best.Price, Quantity: qty, // trade executes at the RESTING price
+>             })
+>
+>             if sellOrder.Remaining() == 0 {
+>                 best.Orders = best.Orders[1:] // fully filled — drop from the FIFO queue
+>             }
+>         }
+>         if len(best.Orders) == 0 {
+>             b.asks = b.asks[1:] // price level exhausted — remove it
+>         }
 >     }
+>     return trades
 > }
 > ```
 > **Pattern used: none (this is the core matching algorithm, not a GoF pattern)** — say this if asked, and name the sorted-slice-vs-heap simplification (Step 4) unprompted, it's a real depth signal.

@@ -69,8 +69,34 @@ A board of a fixed size (standard: 100 cells). Some cells are **snake heads** �
 > type Dice interface {
 >     Roll() int
 > }
+>
+> type FairDice struct{ sides int }
+>
+> func (d *FairDice) Roll() int { return rand.Intn(d.sides) + 1 }
+>
+> func (g *Game) PlayTurn() *Player {
+>     player := g.players[g.currentTurn]
+>     roll := g.dice.Roll()
+>
+>     target := player.Position + roll
+>     if target > g.board.Size() {
+>         g.advanceTurn() // overshoot — stay put, official rule
+>         return nil
+>     }
+>
+>     player.Position = g.board.Resolve(target)
+>     if player.Position == g.board.Size() {
+>         return player // winner
+>     }
+>     g.advanceTurn()
+>     return nil
+> }
+>
+> func (g *Game) advanceTurn() {
+>     g.currentTurn = (g.currentTurn + 1) % len(g.players)
+> }
 > ```
-> **Pattern used: Strategy.** Wire `Game.PlayTurn` — roll, compute target, overshoot check (stay put if `target > board.Size()`), resolve jumps, check win, advance turn.
+> **Pattern used: Strategy.** `PlayTurn` — roll, compute target, overshoot check, resolve jumps via Checkpoint 3's `Board.Resolve`, check win, advance turn — fully wired, not described.
 >
 > **Checkpoint 5 (remaining time, or if asked) — board-construction validation.**
 > ```go

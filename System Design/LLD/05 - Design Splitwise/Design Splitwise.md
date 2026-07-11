@@ -58,33 +58,99 @@ status: reference-quality
 > ```
 > This is a cheap, high-value checkpoint — a runnable demo of the ledger before touching the harder algorithm.
 >
-> **Checkpoint 3 (~15-20 min) — the debt-simplification algorithm. This is usually the actual centerpiece of the interview — prioritize it over split-type extensibility if time is tight.**
+> **Checkpoint 3 (~15-20 min) — the debt-simplification algorithm, fully implemented. This is usually the actual centerpiece of the interview — prioritize it over split-type extensibility if time is tight.**
 > ```go
-> // Greedy: max-heap of creditors, max-heap of debtors, repeatedly
-> // match the top of each and settle min(credit, debt).
+> type balanceEntry struct {
+>     user   string
+>     amount int64
+> }
+>
+> // creditorHeap: max-heap by amount owed TO the user.
+> type creditorHeap []balanceEntry
+>
+> func (h creditorHeap) Len() int            { return len(h) }
+> func (h creditorHeap) Less(i, j int) bool  { return h[i].amount > h[j].amount }
+> func (h creditorHeap) Swap(i, j int)       { h[i], h[j] = h[j], h[i] }
+> func (h *creditorHeap) Push(x interface{}) { *h = append(*h, x.(balanceEntry)) }
+> func (h *creditorHeap) Pop() interface{} {
+>     old := *h
+>     item := old[len(old)-1]
+>     *h = old[:len(old)-1]
+>     return item
+> }
+> // debtorHeap is the same shape, but Less compares ASCENDING
+> // (most-negative first) — full definition in Step 8.
+>
+> // Greedy: repeatedly match the biggest creditor with the biggest
+> // debtor, settle min(credit, debt), push back any remainder.
 > func SimplifyDebts(netBalances map[string]int64) []Transaction {
->     creditors, debtors := buildHeaps(netBalances)
+>     creditors := &creditorHeap{}
+>     debtors := &debtorHeap{}
+>     for user, amount := range netBalances {
+>         if amount > 0 {
+>             heap.Push(creditors, balanceEntry{user: user, amount: amount})
+>         } else if amount < 0 {
+>             heap.Push(debtors, balanceEntry{user: user, amount: amount})
+>         }
+>     }
+>
 >     var transactions []Transaction
 >     for creditors.Len() > 0 && debtors.Len() > 0 {
 >         c := heap.Pop(creditors).(balanceEntry)
 >         d := heap.Pop(debtors).(balanceEntry)
 >         settle := min64(c.amount, -d.amount)
 >         transactions = append(transactions, Transaction{From: d.user, To: c.user, Amount: settle})
->         // push back any remainder — full version in Step 8
+>
+>         if remaining := c.amount - settle; remaining > 0 {
+>             heap.Push(creditors, balanceEntry{user: c.user, amount: remaining})
+>         }
+>         if remaining := d.amount + settle; remaining < 0 {
+>             heap.Push(debtors, balanceEntry{user: d.user, amount: remaining})
+>         }
 >     }
 >     return transactions
 > }
 > ```
 > **Pattern used: none (this is a greedy heap algorithm, not a GoF design pattern)** — say this explicitly if asked, and name the NP-hardness caveat from Step 6 unprompted; it's a real depth signal.
 >
-> **Checkpoint 4 (remaining time, or if asked) — refactor splitting into Strategy.**
+> **Checkpoint 4 (remaining time, or if asked) — refactor splitting into Strategy, all three implementations.**
 > ```go
 > // SplitStrategy — the Strategy pattern, applied to how a total is divided.
 > type SplitStrategy interface {
 >     CalculateShares(totalAmount int64, participants []string, splitData map[string]float64) map[string]int64
 > }
+>
+> // EqualSplitStrategy — Checkpoint 1's math, now distributing any
+> // leftover cent one at a time so shares always sum EXACTLY to totalAmount.
+> type EqualSplitStrategy struct{}
+>
+> func (e EqualSplitStrategy) CalculateShares(totalAmount int64, participants []string, splitData map[string]float64) map[string]int64 {
+>     n := int64(len(participants))
+>     base := totalAmount / n
+>     remainder := totalAmount % n
+>     shares := make(map[string]int64)
+>     for i, p := range participants {
+>         share := base
+>         if int64(i) < remainder {
+>             share++
+>         }
+>         shares[p] = share
+>     }
+>     return shares
+> }
+>
+> // ExactSplitStrategy uses caller-specified exact cent amounts.
+> type ExactSplitStrategy struct{}
+>
+> func (e ExactSplitStrategy) CalculateShares(totalAmount int64, participants []string, splitData map[string]float64) map[string]int64 {
+>     shares := make(map[string]int64)
+>     for _, p := range participants {
+>         shares[p] = int64(splitData[p])
+>     }
+>     return shares
+> }
 > ```
-> **Pattern used: Strategy.** Move Checkpoint 1's equal-split math into `EqualSplitStrategy`, add `ExactSplitStrategy` and `PercentageSplitStrategy` alongside it (full versions in Step 8).
+> **Pattern used: Strategy.** `PercentageSplitStrategy` is the same shape again (Step 8), worth mentioning rather than re-typing if time is short.
 >
 > **If you're short on time:** stop after Checkpoint 3. A working ledger (equal split only) plus a genuinely correct debt-simplification algorithm is a strong, complete answer even without split-type extensibility — describe the `SplitStrategy` refactor verbally.
 

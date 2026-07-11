@@ -56,22 +56,65 @@ Different destinations need **independent** level thresholds — console might s
 >     Handle(level LogLevel, message string)
 > }
 >
+> // BaseHandler factors out the shared "hold the next link, pass
+> // along" skeleton every concrete handler embeds.
+> type BaseHandler struct {
+>     next     LogHandler
+>     minLevel LogLevel
+> }
+>
+> func (b *BaseHandler) SetNext(handler LogHandler) LogHandler {
+>     b.next = handler
+>     return handler
+> }
+>
+> func (b *BaseHandler) passToNext(level LogLevel, message string) {
+>     if b.next != nil {
+>         b.next.Handle(level, message)
+>     }
+> }
+>
+> type ConsoleHandler struct{ BaseHandler }
+>
 > func (c *ConsoleHandler) Handle(level LogLevel, message string) {
 >     if level >= c.minLevel {
 >         fmt.Printf("[%s] %s\n", level, message)
 >     }
 >     c.passToNext(level, message) // called regardless of whether this handler acted
 > }
+>
+> // Logger is the entry point — it owns the head of the chain and
+> // knows nothing about which handlers exist downstream.
+> type Logger struct{ head LogHandler }
+>
+> func (l *Logger) Log(level LogLevel, message string) {
+>     if l.head != nil {
+>         l.head.Handle(level, message)
+>     }
+> }
 > ```
 > **Pattern used: Chain of Responsibility (all-handlers-act variant).** State the deviation from the textbook "first handler wins" version explicitly — it's the single strongest thing you can say in this question.
 >
-> **Checkpoint 4 (remaining time, or if asked) — wire 2-3 handlers, discuss per-environment chains.**
+> **Checkpoint 4 (remaining time, or if asked) — wire a second handler, discuss per-environment chains.**
 > ```go
-> console.SetNext(fileHandler)
-> fileHandler.SetNext(alertHandler)
-> log := NewLogger(console)
+> type FileHandler struct {
+>     BaseHandler
+>     file *os.File
+> }
+>
+> func (f *FileHandler) Handle(level LogLevel, message string) {
+>     if level >= f.minLevel {
+>         fmt.Fprintf(f.file, "[%s] %s\n", level, message)
+>     }
+>     f.passToNext(level, message)
+> }
+>
+> console := &ConsoleHandler{BaseHandler{minLevel: DEBUG}}
+> file := &FileHandler{BaseHandler: BaseHandler{minLevel: INFO}, file: logFile}
+> console.SetNext(file)
+> log := &Logger{head: console}
 > ```
-> No new pattern — just composition. If asked, describe building a shorter chain for dev (console only, skip `alertHandler`) with zero changes to `Logger` itself.
+> No new pattern — just composition. If asked, describe building a shorter chain for dev (console only, skipping a third `RemoteAlertHandler`) with zero changes to `Logger` itself.
 >
 > **If you're short on time:** stop after Checkpoint 3 with just `ConsoleHandler` and one more handler wired. That's a complete, correct Chain of Responsibility with the key nuance stated — a third handler is just "more of the same."
 

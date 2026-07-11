@@ -44,6 +44,13 @@ status: reference-quality
 >     Undo() error
 > }
 >
+> type WithdrawCommand struct {
+>     account   *Account
+>     dispenser *CashDispenser
+>     amount    int64
+>     debited   bool
+> }
+>
 > func (c *WithdrawCommand) Execute() error {
 >     if err := c.account.Debit(c.amount); err != nil {
 >         return err
@@ -53,6 +60,15 @@ status: reference-quality
 >         c.account.Credit(c.amount) // reverse immediately, not later
 >         c.debited = false
 >         return err
+>     }
+>     return nil
+> }
+>
+> func (c *WithdrawCommand) Undo() error {
+>     if c.debited {
+>         c.account.Credit(c.amount)
+>         c.dispenser.Refill(c.amount)
+>         c.debited = false
 >     }
 >     return nil
 > }
@@ -67,10 +83,44 @@ status: reference-quality
 >     ExecuteCommand(s *Session, cmd Command) error
 >     EjectCard(s *Session)
 > }
-> ```
-> **Pattern used: State** — the same `NoCardState → AwaitingPINState → AuthenticatedState` skeleton as the Vending Machine and Elevator chapters. Don't over-explain this one; say "same pattern as before" and move fast.
 >
-> **Checkpoint 4 (remaining time, or if asked) — `commandHistory` + `UndoLast`, add `DepositCommand`.** No new pattern — just using what `Command` already gives you: a technician manually reversing the last transaction becomes `session.UndoLast()`, one line, because every executed command already knows how to undo itself.
+> type NoCardState struct{}
+>
+> func (st *NoCardState) InsertCard(s *Session, cardID string) {
+>     s.cardID = cardID
+>     s.setState(&AwaitingPINState{})
+> }
+> func (st *NoCardState) EnterPIN(s *Session, pin string)              {}
+> func (st *NoCardState) ExecuteCommand(s *Session, cmd Command) error { return ErrNoCard }
+> func (st *NoCardState) EjectCard(s *Session)                         {}
+>
+> type AuthenticatedState struct{}
+>
+> func (st *AuthenticatedState) InsertCard(s *Session, cardID string) {}
+> func (st *AuthenticatedState) EnterPIN(s *Session, pin string)      {}
+> func (st *AuthenticatedState) ExecuteCommand(s *Session, cmd Command) error {
+>     err := cmd.Execute()
+>     s.commandHistory = append(s.commandHistory, cmd)
+>     return err
+> }
+> func (st *AuthenticatedState) EjectCard(s *Session) { s.setState(&NoCardState{}) }
+> ```
+> **Pattern used: State** — the same `NoCardState → AwaitingPINState → AuthenticatedState` skeleton as the Vending Machine and Elevator chapters (`AwaitingPINState` is the same shape again, Step 7). Don't over-explain this one; say "same pattern as before" and move fast.
+>
+> **Checkpoint 4 (remaining time, or if asked) — `commandHistory` + `UndoLast`.**
+> ```go
+> // UndoLast reverses the most recently executed command — e.g. a
+> // technician manually rolling back after a hardware failure.
+> func (s *Session) UndoLast() error {
+>     if len(s.commandHistory) == 0 {
+>         return nil
+>     }
+>     last := s.commandHistory[len(s.commandHistory)-1]
+>     s.commandHistory = s.commandHistory[:len(s.commandHistory)-1]
+>     return last.Undo()
+> }
+> ```
+> No new pattern — just using what `Command` already gives you: reversing the last transaction becomes one line, because every executed command already knows how to undo itself.
 >
 > **If you're short on time:** stop after Checkpoint 2. A single, fully correct `WithdrawCommand` that properly reverses a failed dispense is the actual substance of this question — describe session State verbally as "the same pattern as Vending Machine, applied to card/PIN/authenticated."
 

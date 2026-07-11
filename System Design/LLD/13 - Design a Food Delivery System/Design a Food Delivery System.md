@@ -44,12 +44,27 @@ Order lifecycle: placed → preparing → ready → picked up → delivered. Can
 > type OrderState interface {
 >     Name() string
 >     Prepare(o *Order)
+>     PickUp(o *Order)
 >     Cancel(o *Order) error
 > }
-> ```
-> **Pattern used: State**, same skeleton as Vending Machine/Elevator/ATM. Encode the real business rule directly here: `PickedUpState.Cancel` returns an error, `PreparingState.Cancel` doesn't — before pickup, cancelling only wastes prep effort; after, a partner is already en route.
 >
-> **Checkpoint 3 (~8 min) — partner assignment via Strategy. Recognize the shape before writing it.**
+> type PreparingState struct{}
+>
+> func (s *PreparingState) Name() string     { return "PREPARING" }
+> func (s *PreparingState) Prepare(o *Order) {}
+> func (s *PreparingState) PickUp(o *Order)  { o.setState(&PickedUpState{}) }
+> func (s *PreparingState) Cancel(o *Order) error { return nil } // restaurant absorbs the cost
+>
+> type PickedUpState struct{}
+>
+> func (s *PickedUpState) Name() string          { return "PICKED_UP" }
+> func (s *PickedUpState) Prepare(o *Order)      {}
+> func (s *PickedUpState) PickUp(o *Order)       {}
+> func (s *PickedUpState) Cancel(o *Order) error { return ErrCannotCancelAfterPickup }
+> ```
+> **Pattern used: State**, same skeleton as Vending Machine/Elevator/ATM. `PickedUpState.Cancel` returns an error, `PreparingState.Cancel` doesn't — before pickup, cancelling only wastes prep effort; after, a partner is already en route. `PlacedState`/`ReadyState`/`DeliveredState` are the same shape again (Step 5).
+>
+> **Checkpoint 3 (~8 min) — partner assignment via Strategy, fully implemented. Recognize the shape before writing it.**
 > ```go
 > // AssignmentStrategy — structurally the SAME shape as the Elevator
 > // chapter's SchedulingStrategy: match a request to the nearest
@@ -57,10 +72,22 @@ Order lifecycle: placed → preparing → ready → picked up → delivered. Can
 > type AssignmentStrategy interface {
 >     Assign(partners []*DeliveryPartner) *DeliveryPartner
 > }
+>
+> type NearestPartnerStrategy struct{}
+>
+> func (s NearestPartnerStrategy) Assign(partners []*DeliveryPartner) *DeliveryPartner {
+>     var best *DeliveryPartner
+>     for _, p := range partners {
+>         if best == nil || p.CurrentDistanceFromRestaurant < best.CurrentDistanceFromRestaurant {
+>             best = p
+>         }
+>     }
+>     return best
+> }
 > ```
 > **Pattern used: Strategy (2nd application in this chapter).** Say the recognition out loud — that transfer *is* the skill being tested, not re-deriving Strategy from scratch a second time.
 >
-> **Checkpoint 4 (~8 min) — a SECOND, independent Strategy for pricing.**
+> **Checkpoint 4 (~8 min) — a SECOND, independent Strategy for pricing, fully implemented.**
 > ```go
 > // PricingStrategy — the SAME shape as Parking Lot's PricingStrategy
 > // and Splitwise's SplitStrategy. Independent of AssignmentStrategy —
@@ -68,8 +95,25 @@ Order lifecycle: placed → preparing → ready → picked up → delivered. Can
 > type PricingStrategy interface {
 >     FinalAmount(subtotal int64) int64
 > }
+>
+> type PercentageDiscountStrategy struct {
+>     Percentage       float64
+>     MaxDiscountCents int64
+> }
+>
+> func (s PercentageDiscountStrategy) FinalAmount(subtotal int64) int64 {
+>     discount := int64(float64(subtotal) * s.Percentage / 100)
+>     if discount > s.MaxDiscountCents {
+>         discount = s.MaxDiscountCents
+>     }
+>     final := subtotal - discount
+>     if final < 0 {
+>         return 0
+>     }
+>     return final
+> }
 > ```
-> **Pattern used: Strategy (independent 2nd instance).**
+> **Pattern used: Strategy (independent 2nd instance).** `NoDiscountStrategy`/`FlatDiscountStrategy` are the same shape again (Step 5).
 >
 > **Checkpoint 5 (remaining time, or if asked) — wire Observer directly into `setState`.**
 > ```go

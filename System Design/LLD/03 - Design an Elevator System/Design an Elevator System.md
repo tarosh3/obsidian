@@ -38,9 +38,38 @@ status: reference-quality
 > ```
 > **Pattern used: none.** This is intentionally almost too simple — the goal is a compiling, callable `RequestFloor` before anything else exists.
 >
-> **Checkpoint 2 (~8-10 min) — multiple elevators, naive dispatch, string state.** This is exactly the bad draft in Step 3 below: `state string` ("idle"/"movingUp"/"movingDown"/"doorsOpen") on `Elevator`, and `Building.HandleExternalRequest` hardcoded to `b.elevators[0]`. Write it that way on purpose — narrate *"dispatch is always picking elevator 0 right now, and floor requests get silently dropped while doors are open — both need fixing."*
+> **Checkpoint 2 (~8-10 min) — multiple elevators, naive dispatch, string state.**
+> ```go
+> type Elevator struct {
+>     id           int
+>     currentFloor int
+>     state        string // "idle", "movingUp", "movingDown", "doorsOpen"
+>     destinations []int
+> }
 >
-> **Checkpoint 3 (~8-10 min) — refactor movement into State.**
+> func (e *Elevator) RequestFloor(floor int) {
+>     if e.state == "doorsOpen" {
+>         return // silently dropped — a real bug
+>     }
+>     e.destinations = append(e.destinations, floor)
+>     if floor > e.currentFloor {
+>         e.state = "movingUp"
+>     } else {
+>         e.state = "movingDown"
+>     }
+> }
+>
+> type Building struct {
+>     elevators []*Elevator
+> }
+>
+> func (b *Building) HandleExternalRequest(floor int) {
+>     b.elevators[0].RequestFloor(floor) // always elevator 0 — no scheduling at all
+> }
+> ```
+> **Pattern used: none — write it this way on purpose.** Narrate: *"dispatch is always picking elevator 0 right now, and floor requests get silently dropped while doors are open — both need fixing."*
+>
+> **Checkpoint 3 (~8-10 min) — refactor movement into State, all three states.**
 > ```go
 > // ElevatorState — the State pattern, applied to movement.
 > type ElevatorState interface {
@@ -49,15 +78,50 @@ status: reference-quality
 >     DoorTimerExpired(e *Elevator)
 > }
 >
+> type IdleState struct{}
+>
+> func (s *IdleState) RequestFloor(e *Elevator, floor int) {
+>     e.addDestination(floor)
+>     if floor == e.currentFloor {
+>         e.setState(&DoorsOpenState{})
+>         return
+>     }
+>     e.direction = e.directionToward(floor)
+>     e.setState(&MovingState{})
+> }
+> func (s *IdleState) ArrivedAtDestination(e *Elevator) {}
+> func (s *IdleState) DoorTimerExpired(e *Elevator)     {}
+>
+> // MovingState: "up" vs "down" is the direction FIELD, not two
+> // separate states — everything valid here is identical either way.
+> type MovingState struct{}
+>
+> func (s *MovingState) RequestFloor(e *Elevator, floor int) { e.addDestination(floor) }
+> func (s *MovingState) ArrivedAtDestination(e *Elevator) {
+>     e.removeDestination(e.currentFloor)
+>     e.setState(&DoorsOpenState{})
+> }
+> func (s *MovingState) DoorTimerExpired(e *Elevator) {}
+>
 > type DoorsOpenState struct{}
 >
 > func (s *DoorsOpenState) RequestFloor(e *Elevator, floor int) {
->     e.addDestination(floor) // queued now, not dropped — the bug from Step 3, fixed
+>     e.addDestination(floor) // queued now, not dropped — the bug from Checkpoint 2, fixed
+> }
+> func (s *DoorsOpenState) ArrivedAtDestination(e *Elevator) {}
+> func (s *DoorsOpenState) DoorTimerExpired(e *Elevator) {
+>     if len(e.destinations) == 0 {
+>         e.setState(&IdleState{})
+>         return
+>     }
+>     next := e.nextDestination()
+>     e.direction = e.directionToward(next)
+>     e.setState(&MovingState{})
 > }
 > ```
-> **Pattern used: State.** Note the deliberate *non*-decision here too: "moving up" and "moving down" stay as a `direction` field inside one `MovingState`, not two separate states (Step 5) — everything valid in each is identical, only the field differs.
+> **Pattern used: State.** All three states fully working — this is the checkpoint where the doors-open bug actually gets fixed, not just described.
 >
-> **Checkpoint 4 (~8-10 min) — refactor dispatch into Strategy.**
+> **Checkpoint 4 (~8-10 min) — refactor dispatch into Strategy, fully implemented.**
 > ```go
 > // SchedulingStrategy — the Strategy pattern, applied to dispatch.
 > // Solves a completely different problem than ElevatorState above:
@@ -69,11 +133,31 @@ status: reference-quality
 > type NearestElevatorStrategy struct{}
 >
 > func (n NearestElevatorStrategy) SelectElevator(elevators []*Elevator, requestFloor int, direction Direction) *Elevator {
->     // loop, track the smallest abs(currentFloor - requestFloor) — full version in Step 9
->     return nil
+>     var best *Elevator
+>     bestDistance := -1
+>     for _, e := range elevators {
+>         d := abs(e.CurrentFloor() - requestFloor)
+>         if bestDistance == -1 || d < bestDistance {
+>             bestDistance = d
+>             best = e
+>         }
+>     }
+>     return best
+> }
+>
+> type Building struct {
+>     elevators []*Elevator
+>     strategy  SchedulingStrategy
+> }
+>
+> func (b *Building) HandleExternalRequest(floor int, direction Direction) {
+>     chosen := b.strategy.SelectElevator(b.elevators, floor, direction)
+>     if chosen != nil {
+>         chosen.RequestFloor(floor)
+>     }
 > }
 > ```
-> **Pattern used: Strategy.** `Building` now depends on the interface, never `elevators[0]` directly.
+> **Pattern used: Strategy.** `Building` now depends on the interface, never `elevators[0]` directly — this fully replaces Checkpoint 2's hardcoded dispatch.
 >
 > **Checkpoint 5 (remaining time, or if asked) — concurrency + SCAN-style dispatch.** Each `Elevator` gets its own mutex (Step 9) — different elevators never contend. If asked for a smarter policy, describe SCAN/LOOK disk-scheduling-style dispatch (Step 8) as a *new* `SchedulingStrategy` implementation, not a new architecture.
 >

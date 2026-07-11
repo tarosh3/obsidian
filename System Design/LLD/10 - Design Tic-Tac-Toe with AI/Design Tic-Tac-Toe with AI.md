@@ -53,15 +53,65 @@ status: reference-quality
 > }
 >
 > type RandomMoveStrategy struct{}
+>
+> func (s RandomMoveStrategy) SelectMove(board *Board, player Mark) (int, int) {
+>     empty := board.EmptyCells()
+>     choice := empty[rand.Intn(len(empty))]
+>     return choice[0], choice[1]
+> }
+>
+> type Player struct {
+>     Mark     Mark
+>     Strategy MoveStrategy // nil == human
+> }
 > ```
 > **Pattern used: Strategy.** This alone (random AI, swappable) is a legitimate, complete stopping point if minimax doesn't fit in the remaining time.
 >
-> **Checkpoint 4 (remaining time — this is the actual algorithmic centerpiece) — minimax.**
+> **Checkpoint 4 (remaining time — this is the actual algorithmic centerpiece) — minimax, fully implemented.**
 > ```go
 > func minimax(board *Board, currentTurn, maximizingPlayer Mark, isMaximizing bool) int {
->     if w := board.Winner(); w == maximizingPlayer { return 1 }
->     // ... else -1 for opponent win, 0 for draw/full board
->     // recurse over EmptyCells(), max at isMaximizing levels, min otherwise
+>     winner := board.Winner()
+>     if winner == maximizingPlayer {
+>         return 1
+>     }
+>     opponent := X
+>     if maximizingPlayer == X {
+>         opponent = O
+>     }
+>     if winner == opponent {
+>         return -1
+>     }
+>     if board.IsFull() {
+>         return 0
+>     }
+>
+>     nextTurn := X
+>     if currentTurn == X {
+>         nextTurn = O
+>     }
+>
+>     if isMaximizing {
+>         best := -2
+>         for _, cell := range board.EmptyCells() {
+>             trial := board.Clone()
+>             trial.Set(cell[0], cell[1], currentTurn)
+>             score := minimax(trial, nextTurn, maximizingPlayer, false)
+>             if score > best {
+>                 best = score
+>             }
+>         }
+>         return best
+>     }
+>     best := 2
+>     for _, cell := range board.EmptyCells() {
+>         trial := board.Clone()
+>         trial.Set(cell[0], cell[1], currentTurn)
+>         score := minimax(trial, nextTurn, maximizingPlayer, true)
+>         if score < best {
+>             best = score
+>         }
+>     }
+>     return best
 > }
 > ```
 > **Pattern used: no new GoF pattern — this is a recursive game-tree search algorithm**, and correctness here (not pattern recognition) is what's actually being tested. Get the `isMaximizing`/`currentTurn` bookkeeping right and use `Board.Clone()` (Step 5 — array value-copy, not a manually deep-copied slice) for every trial branch, or the recursion silently corrupts sibling branches.

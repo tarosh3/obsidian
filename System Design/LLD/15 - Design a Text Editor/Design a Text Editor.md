@@ -55,11 +55,31 @@ Insert text at a position. Delete a range. Undo the last operation. Redo an undo
 > ```
 > **Pattern used: Command.** `InsertCommand.Undo` derives its own reversal from data it already has (position + text length) — no external snapshot needed. Get Insert + Undo working for this ONE command before adding Delete.
 >
-> **Checkpoint 3 (~10 min) — `DeleteCommand` (captures a delta, not a snapshot) + the undo/redo stacks.**
+> **Checkpoint 3 (~10 min) — `DeleteCommand` (captures a delta, not a snapshot) + the undo/redo stacks, fully wired.**
 > ```go
+> func (d *Document) insertAt(position int, text string) {
+>     d.content = d.content[:position] + text + d.content[position:]
+> }
+> func (d *Document) deleteRange(start, end int) {
+>     d.content = d.content[:start] + d.content[end:]
+> }
+>
+> type DeleteCommand struct {
+>     doc         *Document
+>     start, end  int
+>     deletedText string
+> }
+>
 > func (c *DeleteCommand) Execute() {
 >     c.deletedText = c.doc.content[c.start:c.end] // captured — the ONLY way Undo can restore it
 >     c.doc.deleteRange(c.start, c.end)
+> }
+> func (c *DeleteCommand) Undo() { c.doc.insertAt(c.start, c.deletedText) }
+>
+> type Editor struct {
+>     doc       *Document
+>     undoStack []Command
+>     redoStack []Command
 > }
 >
 > // execute is the single funnel every edit goes through — and the
@@ -70,6 +90,17 @@ Insert text at a position. Delete a range. Undo the last operation. Redo an undo
 >     cmd.Execute()
 >     e.undoStack = append(e.undoStack, cmd)
 >     e.redoStack = nil
+> }
+>
+> func (e *Editor) Undo() {
+>     if len(e.undoStack) == 0 {
+>         return
+>     }
+>     n := len(e.undoStack) - 1
+>     cmd := e.undoStack[n]
+>     e.undoStack = e.undoStack[:n]
+>     cmd.Undo()
+>     e.redoStack = append(e.redoStack, cmd)
 > }
 > ```
 > This checkpoint is where the actual signal is — say the redo-stack-clear reasoning out loud unprompted, don't wait to be asked.

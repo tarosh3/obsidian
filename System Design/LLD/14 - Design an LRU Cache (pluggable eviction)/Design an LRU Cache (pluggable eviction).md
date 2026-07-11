@@ -25,7 +25,7 @@ status: reference-quality
 `O(1)`-average `Get`/`Put`. Configurable eviction policy at construction time. Thread-safe under concurrent access.
 
 > [!example]+ 🪜 How to build this live, step by step (interview execution order, with code)
-> **Checkpoint 1 (~10-12 min) — plain LRU, no pluggability yet.** This is the mechanics from [[DSA/Linked List/LRU Cache (LeetCode #146)|the DSA LRU Cache note]] — if that's not already fast to write from memory, drill it separately before this chapter's actual point (the wrapper) is worth attempting live.
+> **Checkpoint 1 (~10-12 min) — plain LRU, no pluggability yet, `Get` AND `Put`.** This is the mechanics from [[DSA/Linked List/LRU Cache (LeetCode #146)|the DSA LRU Cache note]] — if that's not already fast to write from memory, drill it separately before this chapter's actual point (the wrapper) is worth attempting live.
 > ```go
 > type Cache struct {
 >     capacity int
@@ -41,6 +41,22 @@ status: reference-quality
 >     }
 >     return nil, false
 > }
+>
+> func (c *Cache) Put(key string, value interface{}) {
+>     if _, exists := c.data[key]; exists {
+>         c.data[key] = value
+>         c.order.MoveToFront(c.elements[key])
+>         return
+>     }
+>     if len(c.data) >= c.capacity {
+>         back := c.order.Back()
+>         delete(c.data, back.Value.(string))
+>         delete(c.elements, back.Value.(string))
+>         c.order.Remove(back)
+>     }
+>     c.data[key] = value
+>     c.elements[key] = c.order.PushFront(key)
+> }
 > ```
 > **Pattern used: none.** LRU only, hardcoded — correctness of `Get`/`Put`/eviction matters more right now than any abstraction.
 >
@@ -54,16 +70,96 @@ status: reference-quality
 >     Evict() (key string, ok bool)
 >     Remove(key string)
 > }
+>
+> // LRUPolicy — Checkpoint 1's order/elements fields and logic,
+> // unchanged, now behind the interface.
+> type LRUPolicy struct {
+>     order    *list.List
+>     elements map[string]*list.Element
+> }
+>
+> func (p *LRUPolicy) RecordAccess(key string) {
+>     if elem, ok := p.elements[key]; ok {
+>         p.order.MoveToFront(elem)
+>     }
+> }
+> func (p *LRUPolicy) RecordInsertion(key string) {
+>     p.elements[key] = p.order.PushFront(key)
+> }
+> func (p *LRUPolicy) Evict() (string, bool) {
+>     back := p.order.Back()
+>     if back == nil {
+>         return "", false
+>     }
+>     key := back.Value.(string)
+>     p.order.Remove(back)
+>     delete(p.elements, key)
+>     return key, true
+> }
+>
+> // Cache — now only holds data + policy. Get/Put delegate every
+> // eviction DECISION to policy, never encoding one themselves.
+> type Cache struct {
+>     capacity int
+>     data     map[string]interface{}
+>     policy   EvictionPolicy
+> }
+>
+> func (c *Cache) Put(key string, value interface{}) {
+>     if _, exists := c.data[key]; exists {
+>         c.data[key] = value
+>         c.policy.RecordAccess(key)
+>         return
+>     }
+>     if len(c.data) >= c.capacity {
+>         if evictKey, ok := c.policy.Evict(); ok {
+>             delete(c.data, evictKey)
+>         }
+>     }
+>     c.data[key] = value
+>     c.policy.RecordInsertion(key)
+> }
 > ```
-> **Pattern used: Strategy.** Move Checkpoint 1's `order`/`elements` fields and logic, unchanged, into an `LRUPolicy` implementing this interface — `Cache` now only holds `map[string]interface{}` plus a `policy EvictionPolicy`.
+> **Pattern used: Strategy.**
 >
 > **Checkpoint 3 (~8 min) — implement `LFUPolicy`, prove the swap works.**
 > ```go
-> cache.NewCache(2, cache.NewLFUPolicy()) // the ENTIRE change needed
-> ```
-> No new pattern — this checkpoint's whole value is demonstrating `Cache.Get`/`Put` never changed at all.
+> type LFUPolicy struct{ frequency map[string]int }
 >
-> **Checkpoint 4 (remaining time, or if asked) — thread safety.** Add the `sync.Mutex` from Step 5 around `Get`/`Put`.
+> func (p *LFUPolicy) RecordAccess(key string)    { p.frequency[key]++ }
+> func (p *LFUPolicy) RecordInsertion(key string) { p.frequency[key] = 1 }
+> func (p *LFUPolicy) Evict() (string, bool) {
+>     var minKey string
+>     minFreq := -1
+>     for k, f := range p.frequency {
+>         if minFreq == -1 || f < minFreq {
+>             minFreq, minKey = f, k
+>         }
+>     }
+>     if minFreq == -1 {
+>         return "", false
+>     }
+>     delete(p.frequency, minKey)
+>     return minKey, true
+> }
+>
+> cache.NewCache(2, &LFUPolicy{frequency: make(map[string]int)}) // the ENTIRE change needed
+> ```
+> This checkpoint's whole value is demonstrating `Cache.Get`/`Put` never changed at all.
+>
+> **Checkpoint 4 (remaining time, or if asked) — thread safety.**
+> ```go
+> func (c *Cache) Get(key string) (interface{}, bool) {
+>     c.mu.Lock()
+>     defer c.mu.Unlock()
+>     value, ok := c.data[key]
+>     if ok {
+>         c.policy.RecordAccess(key)
+>     }
+>     return value, ok
+> }
+> ```
+> Same lock wraps `Put` — a `sync.Mutex` field added to `Cache`, no new pattern.
 >
 > **If you're short on time:** stop after Checkpoint 2. A correct LRU cache behind an `EvictionPolicy` interface — even with only one concrete implementation — proves the design; LFU is "the same shape again," fine to describe rather than fully type out.
 
