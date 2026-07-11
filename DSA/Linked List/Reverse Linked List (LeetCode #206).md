@@ -116,4 +116,4 @@ public:
 
 > [!success] Save-then-overwrite-then-advance is the whole trick
 > The three-line loop body — `save next`, `overwrite next`, `advance both pointers` — is worth being able to write blind. Getting the **order** wrong (e.g. advancing `curr` before saving `temp`) is the single most common way this goes wrong under interview pressure.
-> **Similar pattern:** [[Reorder List (LeetCode #143)]] reuses this exact reversal as a subroutine on half a list. Recursive reversal exists too (reverse the rest, then fix up the current node) — worth knowing both since interviewers sometimes explicitly ask for the recursive version as a follow-up.
+> **Similar pattern:** [[Reorder List (LeetCode #143)]] reuses this exact reversal as a subroutine on half a list. [[Reverse Nodes in k-Group (LeetCode #25)]] reuses it too, capped to stop after k nodes instead of running to the end. Recursive reversal exists too (reverse the rest, then fix up the current node) — worth knowing both since interviewers sometimes explicitly ask for the recursive version as a follow-up.
