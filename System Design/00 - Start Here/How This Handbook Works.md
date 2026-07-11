@@ -74,7 +74,7 @@ Interview question → requirement clarification → **bad first draft** (the na
 
 Chapters are written **one at a time, on request** — say *"write [chapter name]"* and it's produced to the full standard above. The three below are already written as the reference standard for everything that follows.
 
-### ✅ Written (reference-quality, read these to calibrate the bar) — 71 chapters so far
+### ✅ Written (reference-quality, read these to calibrate the bar) — 72 chapters so far
 
 > [!success] Second gap-audit pass: ACID, SOLID, Design Patterns
 > Added [[CS Fundamentals/Databases/ACID & Isolation Levels|ACID & Isolation Levels]] (previously only a broken glossary stub), [[CS Fundamentals/Design Principles/SOLID Principles|SOLID Principles]], and [[CS Fundamentals/Design Principles/Design Patterns Cheat Sheet|Design Patterns Cheat Sheet]] (all 23 GoF patterns — 8 with full LLD chapter treatment, 15 as cheat-sheet-level entries) — consolidating principles that were previously taught correctly but only scattered inline across individual LLD chapters.
@@ -149,6 +149,7 @@ Chapters are written **one at a time, on request** — say *"write [chapter name
 | LLD | [[LLD/21 - Design Google Calendar/Design Google Calendar\|Design Google Calendar]] | ✅ RecurrenceRule Strategy, the time.Time-as-map-key gotcha |
 | HLD | [[HLD/22 - Design Google Meet/Design Google Meet\|Design Google Meet]] | ✅ SFU vs MCU, simulcast, full-mesh O(N²) proof |
 | LLD | [[LLD/22 - Design Google Meet/Design Google Meet\|Design Google Meet]] | ✅ Room-scoped Observer, host-only permission checks |
+| LLD | [[LLD/23 - Design Snake and Ladder/Design Snake and Ladder\|Design Snake and Ladder]] | ✅ Strategy (swappable dice), snake/ladder unified as one "jump" concept, intentionally no locking |
 | HLD | [[HLD/24 - Design an Analytics Aggregation System/Design an Analytics Aggregation System\|Design an Analytics Aggregation System]] | ✅ HyperLogLog, Count-Min Sketch, mergeable sketches, windowed counting |
 | HLD | [[HLD/25 - Design a Search Engine/Design a Search Engine\|Design a Search Engine (Google Search)]] | ✅ Inverted index, TF-IDF/BM25, posting-list compression, sharded search |
 
