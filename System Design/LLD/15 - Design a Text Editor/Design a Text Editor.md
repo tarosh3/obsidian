@@ -21,6 +21,63 @@ status: reference-quality
 
 Insert text at a position. Delete a range. Undo the last operation. Redo an undone operation. Support a reasonably deep undo history.
 
+> [!example]+ 🪜 How to build this live, step by step (interview execution order, with code)
+> **Checkpoint 1 (~5 min) — mutate-in-place, no history, deliberately.**
+> ```go
+> type Document struct {
+>     content string
+> }
+>
+> func (d *Document) Insert(pos int, text string) {
+>     d.content = d.content[:pos] + text + d.content[pos:]
+> }
+> // Undo()? Nothing to undo FROM — the previous state is already gone.
+> ```
+> **Pattern used: none.** Say explicitly: *"there's no if/else mess to refactor here — the problem is there's no record of what changed at all, so undo is structurally impossible right now."*
+>
+> **Checkpoint 2 (~10 min) — refactor into Command, ONE command type first.**
+> ```go
+> // Command — Execute AND Undo. Every command captures whatever it
+> // needs to reverse ITSELF — this is the actual design decision.
+> type Command interface {
+>     Execute()
+>     Undo()
+> }
+>
+> type InsertCommand struct {
+>     doc      *Document
+>     position int
+>     text     string
+> }
+>
+> func (c *InsertCommand) Execute() { c.doc.insertAt(c.position, c.text) }
+> func (c *InsertCommand) Undo()    { c.doc.deleteRange(c.position, c.position+len(c.text)) }
+> ```
+> **Pattern used: Command.** `InsertCommand.Undo` derives its own reversal from data it already has (position + text length) — no external snapshot needed. Get Insert + Undo working for this ONE command before adding Delete.
+>
+> **Checkpoint 3 (~10 min) — `DeleteCommand` (captures a delta, not a snapshot) + the undo/redo stacks.**
+> ```go
+> func (c *DeleteCommand) Execute() {
+>     c.deletedText = c.doc.content[c.start:c.end] // captured — the ONLY way Undo can restore it
+>     c.doc.deleteRange(c.start, c.end)
+> }
+>
+> // execute is the single funnel every edit goes through — and the
+> // ONE place the redo stack gets cleared. Skipping this is a classic
+> // bug: an old "redo" could resurrect edits that no longer make
+> // sense after a new edit was made post-undo.
+> func (e *Editor) execute(cmd Command) {
+>     cmd.Execute()
+>     e.undoStack = append(e.undoStack, cmd)
+>     e.redoStack = nil
+> }
+> ```
+> This checkpoint is where the actual signal is — say the redo-stack-clear reasoning out loud unprompted, don't wait to be asked.
+>
+> **Checkpoint 4 (remaining time, or if asked) — "why not Memento?"** No code needed — explain verbally (Step 5): Memento would snapshot the whole document every keystroke; Command's per-edit delta is far cheaper, and that's *why* real editors use this approach.
+>
+> **If you're short on time:** stop after Checkpoint 2. A single working `InsertCommand` with correct `Execute`/`Undo` proves the entire mechanism — describe `DeleteCommand` and the redo-stack-clear rule verbally as the direct extension.
+
 ## Step 3 — The bad first draft, and why it doesn't fit the usual shape
 
 > [!warning] This one doesn't start as an if/else chain

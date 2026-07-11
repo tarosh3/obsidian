@@ -24,6 +24,68 @@ status: reference-quality
 
 Order lifecycle: placed → preparing → ready → picked up → delivered. Cancellation rules depend on current state (can't cancel after pickup). Extensible partner-assignment logic. **Extensible discount/promo pricing** applied to the order subtotal. **Real-time status updates** pushed to the customer's app as the order progresses — not polled.
 
+> [!example]+ 🪜 How to build this live, step by step (interview execution order, with code)
+> Three patterns live in this chapter — build them one at a time, in the order the requirements naturally surface them.
+>
+> **Checkpoint 1 (~6-8 min) — order lifecycle, string status, flat price, no assignment.**
+> ```go
+> type Order struct {
+>     status   string // "PLACED", "PREPARING", etc.
+>     subtotal int64
+> }
+>
+> func (o *Order) Prepare() { o.status = "PREPARING" }
+> func (o *Order) FinalAmount() int64 { return o.subtotal } // no discounts yet
+> ```
+> **Pattern used: none.** Place → prepare → deliver, working end to end, before any pattern enters.
+>
+> **Checkpoint 2 (~8 min) — refactor lifecycle into State (kept brief — reused pattern, don't over-explain).**
+> ```go
+> type OrderState interface {
+>     Name() string
+>     Prepare(o *Order)
+>     Cancel(o *Order) error
+> }
+> ```
+> **Pattern used: State**, same skeleton as Vending Machine/Elevator/ATM. Encode the real business rule directly here: `PickedUpState.Cancel` returns an error, `PreparingState.Cancel` doesn't — before pickup, cancelling only wastes prep effort; after, a partner is already en route.
+>
+> **Checkpoint 3 (~8 min) — partner assignment via Strategy. Recognize the shape before writing it.**
+> ```go
+> // AssignmentStrategy — structurally the SAME shape as the Elevator
+> // chapter's SchedulingStrategy: match a request to the nearest
+> // available resource. Swap "elevator" for "delivery partner."
+> type AssignmentStrategy interface {
+>     Assign(partners []*DeliveryPartner) *DeliveryPartner
+> }
+> ```
+> **Pattern used: Strategy (2nd application in this chapter).** Say the recognition out loud — that transfer *is* the skill being tested, not re-deriving Strategy from scratch a second time.
+>
+> **Checkpoint 4 (~8 min) — a SECOND, independent Strategy for pricing.**
+> ```go
+> // PricingStrategy — the SAME shape as Parking Lot's PricingStrategy
+> // and Splitwise's SplitStrategy. Independent of AssignmentStrategy —
+> // that's WHY they're two separate interfaces, not one bloated one.
+> type PricingStrategy interface {
+>     FinalAmount(subtotal int64) int64
+> }
+> ```
+> **Pattern used: Strategy (independent 2nd instance).**
+>
+> **Checkpoint 5 (remaining time, or if asked) — wire Observer directly into `setState`.**
+> ```go
+> // setState is the SINGLE funnel every transition passes through —
+> // notification lives here, not duplicated across every state method.
+> func (o *Order) setState(s OrderState) {
+>     o.currentState = s
+>     for _, obs := range o.observers {
+>         obs.OnStatusChanged(o.ID, s.Name())
+>     }
+> }
+> ```
+> **Pattern used: Observer, composed WITH State** — the strongest "aha" in this chapter: real-time tracking isn't a bolted-on side system, it's the state machine's own transition point doing double duty.
+>
+> **If you're short on time:** stop after Checkpoint 3. Working lifecycle (State) plus partner assignment (Strategy #1) is a complete, demoable core — describe pricing and the Observer wiring verbally as the next two layers.
+
 ## Step 3 — The bad first draft (kept brief)
 
 Monolithic `Order` struct with a string status field and inline `if/else` state checks — the same shape as [[LLD/02 - Design a Vending Machine/Design a Vending Machine|Vending Machine]] and [[LLD/11 - Design an ATM/Design an ATM|ATM]] by now — plus hardcoded "assign nearest partner" logic with zero abstraction.

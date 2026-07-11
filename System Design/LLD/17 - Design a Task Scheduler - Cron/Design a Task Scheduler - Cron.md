@@ -21,6 +21,59 @@ status: reference-quality
 
 Support multiple schedule *shapes* (fixed interval, daily at a specific time) without touching the scheduler's core loop for each new one. Notify interested observers on task outcome. A slow task must never block the scheduler from checking or triggering *other* tasks.
 
+> [!example]+ 🪜 How to build this live, step by step (interview execution order, with code)
+> **Checkpoint 1 (~8 min) — one task, fixed interval, sequential loop, no goroutines.**
+> ```go
+> type Task struct {
+>     Interval time.Duration
+>     Run      func() error
+>     nextRun  time.Time
+> }
+>
+> for {
+>     time.Sleep(time.Second)
+>     if time.Now().After(task.nextRun) {
+>         task.Run() // sequential — fine for ONE task
+>         task.nextRun = time.Now().Add(task.Interval)
+>     }
+> }
+> ```
+> **Pattern used: none.** One task, one schedule shape, blocking execution — get the tick-check-run cycle correct before anything else.
+>
+> **Checkpoint 2 (~8 min) — multiple schedule shapes, refactor into Strategy.**
+> ```go
+> // Schedule — Strategy applied to TIME COMPUTATION, not an action.
+> // The scheduler's loop only ever asks "what's next," never HOW.
+> type Schedule interface {
+>     NextRunTime(after time.Time) time.Time
+> }
+>
+> type IntervalSchedule struct{ Interval time.Duration }
+> func (s IntervalSchedule) NextRunTime(after time.Time) time.Time { return after.Add(s.Interval) }
+> ```
+> **Pattern used: Strategy.** Add `DailyAtSchedule` as a second implementation once this compiles — same interface, genuinely different computation.
+>
+> **Checkpoint 3 (~8 min) — Observer for outcomes.**
+> ```go
+> type TaskObserver interface {
+>     OnSuccess(taskName string)
+>     OnFailure(taskName string, err error)
+> }
+> ```
+> **Pattern used: Observer.** Scheduler and Task never know what an observer does with a result — log it, page someone, increment a metric.
+>
+> **Checkpoint 4 (remaining time — this is the actual correctness point) — one goroutine per due task.**
+> ```go
+> // Each due task runs in its OWN goroutine — a slow task must never
+> // block the loop from checking/triggering OTHER tasks.
+> for _, t := range due {
+>     go s.runTask(t, observersCopy)
+> }
+> ```
+> **No new pattern — pure concurrency correctness.** Say explicitly why this matters: without it, a 10-second task delays every other task's due-check for those same 10 seconds if the scheduler's tick interval is, say, 1 second.
+>
+> **If you're short on time:** stop after Checkpoint 2. A scheduler with swappable `Schedule` strategies, even running tasks sequentially, is a strong, complete answer — describe Observer and the per-task-goroutine fix verbally as the next two layers, and be ready to explain WHY sequential execution is a real bug waiting to happen.
+
 ## Step 3 — The bad first draft (kept brief)
 
 A `Scheduler` whose core loop branches on a schedule-type string ("interval" vs "daily") inline, computing "is this task due" differently per branch — the same Open/Closed shape covered repeatedly by now; adding a weekly or cron-expression schedule means editing the loop itself.

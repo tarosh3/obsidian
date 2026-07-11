@@ -24,6 +24,57 @@ status: reference-quality
 
 8×8 board, six piece types each with distinct movement, alternating turns, detect check, reject moves that leave the mover's own king in check.
 
+> [!example]+ 🪜 How to build this live, step by step (interview execution order, with code)
+> Chess is one of the heaviest LLD questions asked — push to scope it down explicitly ("just legal movement + turns, or also check/checkmate/castling?") before writing anything. Realistically you code 2-3 piece types fully, not all 6.
+>
+> **Checkpoint 1 (~8-10 min) — `Board` + ONE piece type, no `Game` yet.**
+> ```go
+> type Piece interface {
+>     Color() Color
+>     ValidMoves(board *Board, from Position) []Position
+> }
+>
+> type Rook struct{ basePiece }
+>
+> func (r *Rook) ValidMoves(board *Board, from Position) []Position {
+>     return slideMoves(board, from, r.color, []Position{{1, 0}, {-1, 0}, {0, 1}, {0, -1}})
+> }
+> ```
+> **Pattern used: none yet — but name where it's going.** Say out loud: *"I'm making `Piece` an interface now instead of a type-switch, because I know I'll need Bishop, Queen, Knight, King, Pawn to plug in the same way."* Get `Board.Get`/`Set` and one working `ValidMoves` call demoable first.
+>
+> **Checkpoint 2 (~10 min) — add 2 more piece types, proving the abstraction generalizes.**
+> ```go
+> // Bishop and Queen reuse slideMoves — they differ only in WHICH
+> // directions they slide, not the sliding mechanics itself.
+> func (b *Bishop) ValidMoves(board *Board, from Position) []Position {
+>     return slideMoves(board, from, b.color, []Position{{1, 1}, {1, -1}, {-1, 1}, {-1, -1}})
+> }
+> ```
+> **Pattern used: polymorphism (structurally the same idea as Strategy elsewhere in this book) replacing a type-switch.** This is the checkpoint that actually proves the design — one shared `slideMoves` helper, zero duplicated sliding logic. Add Knight (fixed-offset jumps, genuinely different shape) if time allows, to show you handle more than one movement style.
+>
+> **Checkpoint 3 (~8-10 min) — `Game` with turn management and basic legality.**
+> ```go
+> func (g *Game) Move(from, to Position) error {
+>     piece := g.board.Get(from)
+>     if piece.Color() != g.currentTurn {
+>         return ErrNotYourTurn
+>     }
+>     // check `to` is in piece.ValidMoves(...), then apply + flip turn
+> }
+> ```
+> **Pattern used: none new** — this wires the pieces from Checkpoints 1-2 into an actual playable sequence.
+>
+> **Checkpoint 4 (remaining time, or if asked) — check detection, reusing existing move logic.**
+> ```go
+> // IsInCheck asks EVERY opposing piece for its own ValidMoves and
+> // checks if any lands on the king's square — reuses Piece.ValidMoves
+> // instead of building a separate, parallel "attack" system.
+> func (b *Board) IsInCheck(color Color) bool { /* Step 5 */ }
+> ```
+> This is the single best "aha" insight to state if you reach it: check detection isn't new logic, it's the *same* `ValidMoves` every piece already has, asked a different question. Castling/en passant/promotion should stay verbal-only (Step 4's Q&A) unless there's genuinely time left.
+>
+> **If you're short on time:** stop after Checkpoint 2. `Board` + 3 piece types with correctly shared sliding logic, demoed with a couple of `ValidMoves` calls, is a strong, complete-feeling answer — describe `Game`, turn management, and check detection verbally as the next layers.
+
 ## Step 3 — The bad first draft (kept brief — a familiar shape by now)
 
 A single `Piece` struct with a type field, and movement validation via a giant switch on piece type living **inside the board/game logic itself**. Adding a new piece variant (or a chess variant with custom pieces) means editing that central switch — the same Open/Closed shape as every prior chapter.

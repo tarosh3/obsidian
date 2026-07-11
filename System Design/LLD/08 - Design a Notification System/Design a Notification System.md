@@ -24,6 +24,57 @@ status: reference-quality
 
 Multiple subscribers can care about the **same** event. Each notification may need filtering (e.g. respect do-not-disturb hours, per-type mute settings) before actually being delivered. Adding a new event type or channel must not require editing existing code.
 
+> [!example]+ 🪜 How to build this live, step by step (interview execution order, with code)
+> **Checkpoint 1 (~8 min) — Observer alone, no filtering yet.**
+> ```go
+> // Observer — the Observer pattern. Publisher never knows who's
+> // subscribed or how many observers exist.
+> type Observer interface {
+>     OnEvent(event Event)
+> }
+>
+> type EventPublisher struct {
+>     observers []Observer
+> }
+>
+> func (p *EventPublisher) Subscribe(o Observer) {
+>     p.observers = append(p.observers, o)
+> }
+>
+> func (p *EventPublisher) Publish(event Event) {
+>     for _, o := range p.observers {
+>         o.OnEvent(event)
+>     }
+> }
+> ```
+> **Pattern used: Observer.** One event type, one observer that just prints — get this firing end-to-end before adding filtering or multiple channels.
+>
+> **Checkpoint 2 (~5 min) — a second observer, prove it fans out.** Subscribe a second `Observer` implementation, publish one event, confirm both fire. No new pattern — just proving Observer's actual payoff (many independent subscribers, zero coupling between them).
+>
+> **Checkpoint 3 (~10 min) — add delivery filtering, once "respect do-not-disturb hours" comes up.**
+> ```go
+> // DeliveryFilter — a Chain of Responsibility variant, contrasted
+> // with the Logger Framework chapter: the FIRST filter that rejects
+> // genuinely stops delivery, unlike Logger's all-handlers-act version.
+> type DeliveryFilter interface {
+>     ShouldDeliver(event Event) bool
+> }
+>
+> func (c *FilterChain) ShouldDeliver(event Event) bool {
+>     for _, f := range c.filters {
+>         if !f.ShouldDeliver(event) {
+>             return false // first rejection stops the chain
+>         }
+>     }
+>     return true
+> }
+> ```
+> **Pattern used: Chain of Responsibility (first-rejection-stops variant) composed with Observer.** Say explicitly why this variant differs from the Logger chapter's — the two patterns solve genuinely different problems ("who's interested" vs. "should this specific delivery happen right now"), and Go's idiomatic expression here is a plain ordered slice, not a linked chain of node objects.
+>
+> **Checkpoint 4 (remaining time, or if asked) — wire a `ChannelObserver` combining both, add a second filter.** No new pattern — composition of what already exists.
+>
+> **If you're short on time:** stop after Checkpoint 2. A working Observer with multiple independent subscribers is a complete answer to "how do multiple parties get notified" — describe the filter chain verbally as how you'd add delivery rules on top.
+
 ## Step 3 — The bad first draft (kept brief — you've seen this shape 6 times now)
 
 A single `NotificationManager` with a giant `switch` on event type, hardcoding channel-sending logic inline per branch. Adding a new event type *or* a new channel means editing the same sprawling method — the same Open/Closed violation as every prior chapter's bad draft.

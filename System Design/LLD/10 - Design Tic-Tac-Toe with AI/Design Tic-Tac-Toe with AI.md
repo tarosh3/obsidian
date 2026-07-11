@@ -21,6 +21,53 @@ status: reference-quality
 
 3×3 board, alternating X/O, win/draw detection. An AI opponent that can play automatically, with **swappable difficulty** — easy (weak) vs. unbeatable optimal play — without the core game loop needing to know which it's facing.
 
+> [!example]+ 🪜 How to build this live, step by step (interview execution order, with code)
+> **Checkpoint 1 (~10 min) — two humans, board + win detection, no AI at all.**
+> ```go
+> func (g *Game) PlayTurn(row, col int) error {
+>     if g.board.Get(row, col) != Empty {
+>         return ErrCellOccupied
+>     }
+>     g.board.Set(row, col, g.CurrentPlayer().Mark)
+>     g.currentPlayer = 1 - g.currentPlayer
+>     return nil
+> }
+> ```
+> **Pattern used: none.** Get two humans playing a full game to a win/draw before AI enters the picture at all — this alone is a demoable, complete mini-product.
+>
+> **Checkpoint 2 (~5 min) — AI hardcoded, deliberately weak.**
+> ```go
+> func (g *Game) aiMove() (int, int) {
+>     empty := g.board.EmptyCells()
+>     return empty[0][0], empty[0][1] // always the first empty cell
+> }
+> ```
+> **Pattern used: none yet.** Narrate: *"this AI is trivially beatable, and adding a 'hard' difficulty later means editing this function again — I'd pull move selection behind an interface."*
+>
+> **Checkpoint 3 (~8 min) — refactor into Strategy, one real (non-minimax) implementation.**
+> ```go
+> // MoveStrategy — the Strategy pattern. A human player is simply one
+> // with Strategy == nil; Game checks for nil and takes external input.
+> type MoveStrategy interface {
+>     SelectMove(board *Board, player Mark) (row, col int)
+> }
+>
+> type RandomMoveStrategy struct{}
+> ```
+> **Pattern used: Strategy.** This alone (random AI, swappable) is a legitimate, complete stopping point if minimax doesn't fit in the remaining time.
+>
+> **Checkpoint 4 (remaining time — this is the actual algorithmic centerpiece) — minimax.**
+> ```go
+> func minimax(board *Board, currentTurn, maximizingPlayer Mark, isMaximizing bool) int {
+>     if w := board.Winner(); w == maximizingPlayer { return 1 }
+>     // ... else -1 for opponent win, 0 for draw/full board
+>     // recurse over EmptyCells(), max at isMaximizing levels, min otherwise
+> }
+> ```
+> **Pattern used: no new GoF pattern — this is a recursive game-tree search algorithm**, and correctness here (not pattern recognition) is what's actually being tested. Get the `isMaximizing`/`currentTurn` bookkeeping right and use `Board.Clone()` (Step 5 — array value-copy, not a manually deep-copied slice) for every trial branch, or the recursion silently corrupts sibling branches.
+>
+> **If you're short on time:** stop after Checkpoint 3. A fully working two-human game plus a swappable-but-simple AI (random, or "block an immediate win") is complete and correct — describe minimax verbally: the recursive idea, the perspective-flipping, and why `Clone()` matters, even without full working code.
+
 ## Step 3 — The bad first draft (kept brief)
 
 AI move selection hardcoded inline in the game loop (e.g. "always pick the first empty cell" — trivially weak). Adding a "hard" difficulty means editing the game loop directly — the familiar Open/Closed shape.

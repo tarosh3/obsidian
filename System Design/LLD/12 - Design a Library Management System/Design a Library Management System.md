@@ -21,6 +21,64 @@ status: reference-quality
 
 Multiple item types (books, DVDs, magazines) with different loan periods. Members can place holds on unavailable titles. Returning a copy should notify the **first** person in that title's hold queue, in fair FIFO order.
 
+> [!example]+ 🪜 How to build this live, step by step (interview execution order, with code)
+> **Checkpoint 1 (~8 min) — one item type, simple checkout/return, no hold queue.**
+> ```go
+> type Catalog struct {
+>     availableCopies map[string]int
+> }
+>
+> func (c *Catalog) Checkout(title string) bool {
+>     if c.availableCopies[title] <= 0 {
+>         return false
+>     }
+>     c.availableCopies[title]--
+>     return true
+> }
+>
+> func (c *Catalog) Return(title string) {
+>     c.availableCopies[title]++
+> }
+> ```
+> **Pattern used: none.** Books only, one loan period, no holds — get checkout/return genuinely working first.
+>
+> **Checkpoint 2 (~8 min) — multiple item types, refactor into Factory.**
+> ```go
+> // NewLibraryItem centralizes the type switch into ONE place — this
+> // is the deliberate exception to "avoid switches": the switch
+> // doesn't disappear, it gets concentrated here instead of scattered
+> // across every method that needs to know an item's type.
+> func NewLibraryItem(itemType ItemType, title string) LibraryItem {
+>     switch itemType {
+>     case DVDType:
+>         return &DVD{title: title}
+>     default:
+>         return &Book{title: title}
+>     }
+> }
+> ```
+> **Pattern used: Factory.** Say explicitly why this switch is fine when every earlier chapter's switch wasn't — this is a strong, specific thing to articulate unprompted.
+>
+> **Checkpoint 3 (~10 min) — hold queue + Observer, once "notify me when it's back" comes up.**
+> ```go
+> type HoldObserver interface {
+>     OnAvailable(title string)
+> }
+>
+> func (c *Catalog) Return(title string) {
+>     if queue := c.holdQueues[title]; len(queue) > 0 {
+>         next := queue[0]
+>         c.holdQueues[title] = queue[1:]
+>         next.OnAvailable(title) // FIFO fairness by construction
+>         return
+>     }
+>     c.availableCopies[title]++
+> }
+> ```
+> **Pattern used: Observer**, reused from earlier chapters, applied here to "item became available" instead of a generic event bus.
+>
+> **If you're short on time:** stop after Checkpoint 2. Multiple item types via Factory, with checkout/return working, is a complete answer — describe the hold-queue Observer verbally as the next layer.
+
 ## Step 3 — The bad first draft (kept brief)
 
 A single `LibraryItem` struct with a type field, and checkout logic branching on that type inline to determine the loan period — the same Open/Closed shape as every prior chapter.

@@ -23,6 +23,57 @@ status: reference-quality
 
 **Non-functional — the one that defines this problem:** transactions must be **atomic between account state and physical cash state** — never dispense cash without debiting the account, and critically, never leave the account debited if cash dispensing then fails. Support cancel/undo before a transaction fully commits.
 
+> [!example]+ 🪜 How to build this live, step by step (interview execution order, with code)
+> **Checkpoint 1 (~6-8 min) — one operation, no session, no undo.**
+> ```go
+> func Withdraw(account *Account, dispenser *CashDispenser, amount int64) error {
+>     if err := account.Debit(amount); err != nil {
+>         return err
+>     }
+>     return dispenser.Dispense(amount) // if THIS fails, the account is now wrong — bug, on purpose
+> }
+> ```
+> **Pattern used: none — and a live bug, deliberately.** Narrate it: *"if `Dispense` fails after `Debit` already succeeded, the account is short with no cash given — I need a way to reverse the debit specifically when that happens."*
+>
+> **Checkpoint 2 (~10-12 min) — fix it with Command. This IS the core insight of the whole question.**
+> ```go
+> // Command — Execute AND Undo. The real-world mechanism for
+> // reversing a debit when dispensing fails AFTER it succeeded.
+> type Command interface {
+>     Execute() error
+>     Undo() error
+> }
+>
+> func (c *WithdrawCommand) Execute() error {
+>     if err := c.account.Debit(c.amount); err != nil {
+>         return err
+>     }
+>     c.debited = true
+>     if err := c.dispenser.Dispense(c.amount); err != nil {
+>         c.account.Credit(c.amount) // reverse immediately, not later
+>         c.debited = false
+>         return err
+>     }
+>     return nil
+> }
+> ```
+> **Pattern used: Command.** Get this one command fully correct — including the `debited bool` bookkeeping so `Undo()` knows whether there's actually anything to reverse — before adding session state at all.
+>
+> **Checkpoint 3 (~8-10 min) — session lifecycle via State (kept brief on purpose — reused pattern).**
+> ```go
+> type SessionState interface {
+>     InsertCard(s *Session, cardID string)
+>     EnterPIN(s *Session, pin string)
+>     ExecuteCommand(s *Session, cmd Command) error
+>     EjectCard(s *Session)
+> }
+> ```
+> **Pattern used: State** — the same `NoCardState → AwaitingPINState → AuthenticatedState` skeleton as the Vending Machine and Elevator chapters. Don't over-explain this one; say "same pattern as before" and move fast.
+>
+> **Checkpoint 4 (remaining time, or if asked) — `commandHistory` + `UndoLast`, add `DepositCommand`.** No new pattern — just using what `Command` already gives you: a technician manually reversing the last transaction becomes `session.UndoLast()`, one line, because every executed command already knows how to undo itself.
+>
+> **If you're short on time:** stop after Checkpoint 2. A single, fully correct `WithdrawCommand` that properly reverses a failed dispense is the actual substance of this question — describe session State verbally as "the same pattern as Vending Machine, applied to card/PIN/authenticated."
+
 ## Step 3 — The bad first draft (kept brief)
 
 A single `ATM` struct with string/boolean flags for session state, and one monolithic `ProcessTransaction` method branching on an operation string, directly mutating account balance and dispenser state together inline — same Open/Closed and correctness-risk shape as every prior chapter, now compounded by having **no undo capability at all** if something fails partway through.

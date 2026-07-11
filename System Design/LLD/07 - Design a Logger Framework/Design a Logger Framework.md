@@ -21,6 +21,60 @@ status: reference-quality
 
 Different destinations need **independent** level thresholds — console might show everything from `DEBUG`, a log file might only persist `INFO`+, remote alerting should only fire on `ERROR`. Adding a new destination (a Slack alert on `ERROR`, a metrics counter increment) must not require touching existing destinations' code.
 
+> [!example]+ 🪜 How to build this live, step by step (interview execution order, with code)
+> **Checkpoint 1 (~6-8 min) — one destination, hardcoded.**
+> ```go
+> type Logger struct {
+>     minLevel int
+> }
+>
+> func (l *Logger) Log(level int, message string) {
+>     if level >= l.minLevel {
+>         fmt.Println(message)
+>     }
+> }
+> ```
+> **Pattern used: none.** Console-only, one threshold — get this compiling before adding a second destination at all.
+>
+> **Checkpoint 2 (~5 min) — add a second destination inline, feel the pain.**
+> ```go
+> func (l *Logger) Log(level int, message string) {
+>     if level >= l.consoleMinLevel { fmt.Println(message) }
+>     if level >= l.fileMinLevel { /* write to file, inline */ }
+> }
+> ```
+> **Pattern used: still none.** Narrate: *"every new destination is another field and another branch in this one method — I'd want each destination to own its own threshold and logic independently."*
+>
+> **Checkpoint 3 (~10-12 min) — refactor into Chain of Responsibility, with the deviation stated out loud.**
+> ```go
+> // LogHandler — Chain of Responsibility. UNLIKE the textbook version
+> // (first handler that can act, stops the chain), every eligible
+> // handler here acts AND passes along — an ERROR should hit console
+> // AND file AND remote alert simultaneously, not just the first.
+> type LogHandler interface {
+>     SetNext(handler LogHandler) LogHandler
+>     Handle(level LogLevel, message string)
+> }
+>
+> func (c *ConsoleHandler) Handle(level LogLevel, message string) {
+>     if level >= c.minLevel {
+>         fmt.Printf("[%s] %s\n", level, message)
+>     }
+>     c.passToNext(level, message) // called regardless of whether this handler acted
+> }
+> ```
+> **Pattern used: Chain of Responsibility (all-handlers-act variant).** State the deviation from the textbook "first handler wins" version explicitly — it's the single strongest thing you can say in this question.
+>
+> **Checkpoint 4 (remaining time, or if asked) — wire 2-3 handlers, discuss per-environment chains.**
+> ```go
+> console.SetNext(fileHandler)
+> fileHandler.SetNext(alertHandler)
+> log := NewLogger(console)
+> ```
+> No new pattern — just composition. If asked, describe building a shorter chain for dev (console only, skip `alertHandler`) with zero changes to `Logger` itself.
+>
+> **If you're short on time:** stop after Checkpoint 3 with just `ConsoleHandler` and one more handler wired. That's a complete, correct Chain of Responsibility with the key nuance stated — a third handler is just "more of the same."
+
 ## Step 3 — The bad first draft
 
 ```go

@@ -21,6 +21,64 @@ status: reference-quality
 
 Submit a limit buy or sell order (price + quantity). Match against the opposite side's book using **price-time priority**: best price first, and among orders tied on price, earliest submitted first — the standard real-exchange matching rule. Support **partial fills** — one incoming order may match against multiple resting orders to fill its full quantity. Cancel an unfilled or partially-filled order.
 
+> [!example]+ 🪜 How to build this live, step by step (interview execution order, with code)
+> One of the more algorithmically dense LLD questions — build correctness on the simplest possible case first, then widen.
+>
+> **Checkpoint 1 (~8 min) — one resting order, one incoming order, exact same price, full fill.**
+> ```go
+> type Order struct {
+>     ID       string
+>     Side     Side
+>     Price    int64
+>     Quantity int64
+>     Filled   int64
+> }
+>
+> // Simplest possible match: if the incoming order's price equals the
+> // one resting order's price, fill it completely. No book structure yet.
+> func matchSimple(incoming, resting *Order) *Trade {
+>     if incoming.Price == resting.Price {
+>         qty := min64(incoming.Quantity, resting.Quantity)
+>         return &Trade{Price: resting.Price, Quantity: qty}
+>     }
+>     return nil
+> }
+> ```
+> **Pattern used: none.** No sorting, no price levels — just prove one trade can fire correctly.
+>
+> **Checkpoint 2 (~8 min) — FIFO within one price (time priority).**
+> ```go
+> // PriceLevel — a FIFO queue at ONE price. Enforces time priority
+> // among orders already tied on price.
+> type PriceLevel struct {
+>     Price  int64
+>     Orders []*Order // index 0 = oldest, matched first
+> }
+> ```
+> Multiple resting orders at the same price now fill in arrival order — this is a real, easy-to-get-wrong detail worth calling out explicitly.
+>
+> **Checkpoint 3 (~10-12 min) — sorted price levels (price priority) + the real matching loop.**
+> ```go
+> // bids sorted DESCENDING (best/highest first), asks ASCENDING
+> // (best/lowest first). This ordering + FIFO per level IS price-time priority.
+> func (b *OrderBook) matchBuy(buyOrder *Order) []Trade {
+>     for buyOrder.Remaining() > 0 && len(b.asks) > 0 {
+>         best := b.asks[0]
+>         if best.Price > buyOrder.Price {
+>             break // sorted ascending — nothing further out qualifies either
+>         }
+>         // drain best.Orders FIFO, computing qty = min(remaining, remaining)
+>     }
+> }
+> ```
+> **Pattern used: none (this is the core matching algorithm, not a GoF pattern)** — say this if asked, and name the sorted-slice-vs-heap simplification (Step 4) unprompted, it's a real depth signal.
+>
+> **Checkpoint 4 (remaining time) — partial fills across TWO separate incoming orders.** Trace the exact numeric example already in Step 4's `main.go`: a 100-share resting sell, a 60-share buy (partial fill, resting order stays with 40 remaining), then a second 40-share buy (fully drains it). This is the scenario worth demoing live, not just claiming works.
+>
+> **If asked, not required — concurrency, cancel, market orders.** One mutex per `OrderBook` (Step 5), `orders map[string]*Order` for O(1) cancel lookup, market orders as a different `MatchingStrategy` (Step-5 Q&A) sweeping the book instead of stopping at a limit price.
+>
+> **If you're short on time:** stop after Checkpoint 3 with a single price level's matching fully correct. Multi-price-level sorting is "more of the same structure" — describe it verbally if you don't reach full implementation.
+
 ## Step 3 — The bad first draft
 
 A flat, unsorted list of all pending orders, matched by **linearly scanning** the entire list for a compatible counterparty every time a new order arrives:

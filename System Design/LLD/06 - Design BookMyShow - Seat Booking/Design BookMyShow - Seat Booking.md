@@ -23,6 +23,64 @@ status: reference-quality
 
 **Non-functional — and the one that defines this entire problem:** **a seat can never be double-booked, under any concurrent access pattern.** Seats must be **temporarily held** during checkout (not locked forever if a user abandons the flow) — a hold-with-expiry requirement, not just a lock.
 
+> [!example]+ 🪜 How to build this live, step by step (interview execution order, with code)
+> This chapter's whole point is a concurrency bug, not a missing abstraction — build the buggy version *on purpose* and demonstrate you can reproduce the race before fixing it.
+>
+> **Checkpoint 1 (~5-8 min) — one seat, the buggy version, deliberately.**
+> ```go
+> type Seat struct {
+>     ID     string
+>     booked bool
+> }
+>
+> func (s *Seat) BookSeat() bool {
+>     if !s.booked { // <-- another goroutine can interleave right here
+>         s.booked = true
+>         return true
+>     }
+>     return false
+> }
+> ```
+> **Pattern used: none — and no mutex yet, on purpose.** Say out loud: *"this has a check-then-act race — two goroutines can both read `booked == false` before either writes."* Naming the bug before fixing it is stronger than jumping straight to the correct version.
+>
+> **Checkpoint 2 (~8-10 min) — fix with one atomic method, still one seat.**
+> ```go
+> func (s *Seat) TryHold(holderID string, expiry time.Time) bool {
+>     s.mu.Lock()
+>     defer s.mu.Unlock()
+>     if s.Status != Available {
+>         return false
+>     }
+>     s.Status = Held
+>     s.heldBy = holderID
+>     s.holdExpiry = expiry
+>     return true
+> }
+> ```
+> **Pattern used: none — a guarded atomic transition, not a design pattern.** Explicitly say why this ISN'T the State pattern from earlier chapters (Step 5): the actions here don't have meaningfully different *behavior* per state, just a legality check — a plain enum guarded by a mutex is simpler and equally correct.
+>
+> **Checkpoint 3 (~10 min) — multi-seat hold, all-or-nothing.**
+> ```go
+> func (b *BookingService) HoldSeats(showID, userID string, seatIDs []string) error {
+>     var held []string
+>     for _, seatID := range seatIDs {
+>         if !show.Seats[seatID].TryHold(userID, expiry) {
+>             for _, heldID := range held {
+>                 show.Seats[heldID].Release(userID) // roll back partial holds
+>             }
+>             return ErrSeatUnavailable
+>         }
+>         held = append(held, seatID)
+>     }
+>     return nil
+> }
+> ```
+> This is the checkpoint most candidates skip — a user wanting 4 seats together shouldn't end up stuck holding 2 unusable ones. Full version in Step 8.
+>
+> **Checkpoint 4 (remaining time, or if asked) — hold expiry + confirm, then the distributed follow-up.** Add `expireIfNeeded` (lazy reclaim, Step 8) and `Confirm`. If pushed on multi-server deployment, say it verbally: this `sync.Mutex` only works within one process — a real distributed deployment needs the same atomic check-and-hold done via Redis + a Lua script instead (Step 7).
+>
+> **If you're short on time:** stop after Checkpoint 2. A single seat with a correctly fixed race condition, demonstrated with the concurrent test in Step 8's `main.go`, is the actual core of this question — multi-seat holding and expiry are real but secondary extensions.
+
 ## Step 3 — The bad first draft
 
 ```go

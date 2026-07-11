@@ -24,6 +24,48 @@ status: reference-quality
 
 Users join a chat room. A sent message reaches all other members. Users shouldn't need to hold direct references to every other user — avoiding tight, N-way coupling.
 
+> [!example]+ 🪜 How to build this live, step by step (interview execution order, with code)
+> **Checkpoint 1 (~6 min) — the buggy N-to-N version, deliberately.**
+> ```go
+> type User struct {
+>     Name   string
+>     Others []*User // every other member — kept in sync manually
+> }
+>
+> func (u *User) SendMessage(msg string) {
+>     for _, other := range u.Others {
+>         other.Receive(u, msg)
+>     }
+> }
+> ```
+> **Pattern used: none.** Works for 2-3 hardcoded users. Narrate: *"every user needs a reference to every other user — that's O(N²) references to maintain, and users are coupled directly to each other instead of through anything shared."*
+>
+> **Checkpoint 2 (~10-12 min) — refactor into Mediator.**
+> ```go
+> // ChatMediator — the Mediator pattern. Replaces every User needing
+> // a direct reference to every other User.
+> type ChatMediator interface {
+>     SendMessage(from *User, message string)
+>     Join(user *User)
+> }
+>
+> type User struct {
+>     Name     string
+>     mediator ChatMediator // the ONLY reference a User ever holds
+> }
+>
+> func (u *User) Send(message string) {
+>     u.mediator.SendMessage(u, message)
+> }
+> ```
+> **Pattern used: Mediator.** This is the checkpoint that matters — get `ChatRoom.Join` and `ChatRoom.SendMessage` (looping its own member list, excluding the sender) working for 3 users before anything else.
+>
+> **Checkpoint 3 (~5 min) — prove it with 3 users, one message.** Join Alice/Bob/Carol, `alice.Send(...)`, confirm Bob and Carol receive it and Alice doesn't. This is a cheap, convincing demo of the whole design.
+>
+> **Checkpoint 4 (remaining time, or if asked) — Mediator vs. Observer, and private messages.** No code needed for the distinction — state it precisely (Step 5): Observer broadcasts a state *change*; Mediator centralizes *how peers communicate*. If asked for 1-to-1 messaging, add `SendPrivate(from, to *User, message string)` to the same mediator — the room stays the one place that knows how to route any shape of message.
+>
+> **If you're short on time:** stop after Checkpoint 2 with 2 users proven working. The Mediator refactor itself, demonstrated even minimally, is the entire point of this question.
+
 ## Step 3 — The bad first draft
 
 Each `User` holds a list of **every other user** directly, and `SendMessage` loops over that list calling each one's `ReceiveMessage`:

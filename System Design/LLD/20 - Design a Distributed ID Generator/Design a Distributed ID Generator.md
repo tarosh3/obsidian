@@ -21,6 +21,51 @@ status: reference-quality
 
 No central coordination per ID generated. IDs roughly sortable by generation time. Many machines generating concurrently, IDs still guaranteed globally unique.
 
+> [!example]+ 🪜 How to build this live, step by step (interview execution order, with code)
+> **Checkpoint 1 (~3-5 min) — name the naive approach, don't implement it.**
+> ```go
+> // A shared counter (Redis INCR / DB sequence) — mention this,
+> // don't build it. It works, but costs a network round-trip PER ID.
+> ```
+> **Pattern used: none.** This checkpoint is verbal — state the naive approach and its cost quickly, then move straight to the real design. Building the bad version isn't worth the time here the way it was in other chapters, since the fix is a completely different mechanism, not a refactor of this one.
+>
+> **Checkpoint 2 (~10 min) — the bit layout + happy-path `NextID`, no wraparound handling yet.**
+> ```go
+> const (
+>     timestampBits = 41
+>     machineIDBits = 10
+>     sequenceBits  = 12
+>     machineIDShift = sequenceBits
+>     timestampShift = sequenceBits + machineIDBits
+> )
+>
+> func (g *SnowflakeGenerator) NextID() int64 {
+>     now := time.Now().UnixMilli() - customEpoch
+>     return (now << timestampShift) | (g.machineID << machineIDShift) | g.sequence
+> }
+> ```
+> **Pattern used: none — this is a bit-packing scheme, not a GoF pattern.** Get the shift/mask arithmetic correct and demo a couple of IDs decoding sensibly before touching concurrency at all.
+>
+> **Checkpoint 3 (~10 min) — same-millisecond sequence handling. This is the actual correctness-critical part.**
+> ```go
+> if now == g.lastTimestamp {
+>     g.sequence = (g.sequence + 1) & maxSequence
+>     if g.sequence == 0 {
+>         for now <= g.lastTimestamp { // sequence exhausted — spin to next ms
+>             now = time.Now().UnixMilli() - customEpoch
+>         }
+>     }
+> } else {
+>     g.sequence = 0
+> }
+> g.lastTimestamp = now
+> ```
+> Trace it out loud: two calls in the same millisecond get different sequence numbers; a call in a new millisecond resets to 0. This is what actually guarantees no two IDs from one machine collide.
+>
+> **Checkpoint 4 (remaining time, or if asked) — the clock-regression edge case, verbally.** A real, known Snowflake weakness (Step 8's Q&A) — if the system clock moves backward (NTP adjustment), this implementation doesn't detect it. Naming this unprompted, rather than waiting to be caught, is a strong signal.
+>
+> **If you're short on time:** stop after Checkpoint 2 with the mutex added. A correct bit-packing scheme without full sequence-wraparound handling still demonstrates the entire mechanism — describe the same-millisecond collision case verbally as the remaining correctness gap.
+
 ## Step 3 — The bad first draft, and why TinyURL's fix was only partial
 
 A single shared counter (Redis `INCR` or a DB sequence) works, but requires a network round-trip **per ID generated** — the exact bottleneck [[HLD/01 - Design TinyURL (URL Shortener)/Design TinyURL|the TinyURL chapter]] named and partially mitigated via **range allocation** (handing each server a pre-fetched block of IDs). Range allocation reduces round-trips but doesn't eliminate the shared-counter dependency entirely — this chapter builds the fully-local alternative that dependency was pointing toward.

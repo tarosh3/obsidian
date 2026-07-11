@@ -23,6 +23,71 @@ status: reference-quality
 
 **Non-functional:** money math must be **exact to the cent** — no drift. Split logic must be extensible (new split types shouldn't touch existing ones). Debt simplification should be efficient even for larger groups.
 
+> [!example]+ 🪜 How to build this live, step by step (interview execution order, with code)
+> One exception to the usual "defer every decision" advice: **decide on integer cents immediately**, even in your throwaway first version. Retrofitting money-type correctness after writing `float64` everywhere is far more painful than just starting right — this is the one upfront decision worth making before you've felt any pain.
+>
+> **Checkpoint 1 (~8-10 min) — equal split only, no Strategy, but cents from the start.**
+> ```go
+> type ExpenseManager struct {
+>     balances map[string]map[string]int64 // cents — decided now, not "later"
+> }
+>
+> func (m *ExpenseManager) AddExpense(paidBy string, totalAmount int64, participants []string) {
+>     share := totalAmount / int64(len(participants)) // remainder handling comes later
+>     for _, p := range participants {
+>         if p != paidBy {
+>             m.balances[paidBy][p] += share
+>             m.balances[p][paidBy] -= share
+>         }
+>     }
+> }
+> ```
+> **Pattern used: none yet.** Ignore exact/percentage splits entirely for now — get one split type recording balances correctly first.
+>
+> **Checkpoint 2 (~5 min) — `NetBalances()`, a live demo of "who owes what."**
+> ```go
+> func (m *ExpenseManager) NetBalances() map[string]int64 {
+>     net := make(map[string]int64)
+>     for user, owedByOthers := range m.balances {
+>         for _, amount := range owedByOthers {
+>             net[user] += amount
+>         }
+>     }
+>     return net
+> }
+> ```
+> This is a cheap, high-value checkpoint — a runnable demo of the ledger before touching the harder algorithm.
+>
+> **Checkpoint 3 (~15-20 min) — the debt-simplification algorithm. This is usually the actual centerpiece of the interview — prioritize it over split-type extensibility if time is tight.**
+> ```go
+> // Greedy: max-heap of creditors, max-heap of debtors, repeatedly
+> // match the top of each and settle min(credit, debt).
+> func SimplifyDebts(netBalances map[string]int64) []Transaction {
+>     creditors, debtors := buildHeaps(netBalances)
+>     var transactions []Transaction
+>     for creditors.Len() > 0 && debtors.Len() > 0 {
+>         c := heap.Pop(creditors).(balanceEntry)
+>         d := heap.Pop(debtors).(balanceEntry)
+>         settle := min64(c.amount, -d.amount)
+>         transactions = append(transactions, Transaction{From: d.user, To: c.user, Amount: settle})
+>         // push back any remainder — full version in Step 8
+>     }
+>     return transactions
+> }
+> ```
+> **Pattern used: none (this is a greedy heap algorithm, not a GoF design pattern)** — say this explicitly if asked, and name the NP-hardness caveat from Step 6 unprompted; it's a real depth signal.
+>
+> **Checkpoint 4 (remaining time, or if asked) — refactor splitting into Strategy.**
+> ```go
+> // SplitStrategy — the Strategy pattern, applied to how a total is divided.
+> type SplitStrategy interface {
+>     CalculateShares(totalAmount int64, participants []string, splitData map[string]float64) map[string]int64
+> }
+> ```
+> **Pattern used: Strategy.** Move Checkpoint 1's equal-split math into `EqualSplitStrategy`, add `ExactSplitStrategy` and `PercentageSplitStrategy` alongside it (full versions in Step 8).
+>
+> **If you're short on time:** stop after Checkpoint 3. A working ledger (equal split only) plus a genuinely correct debt-simplification algorithm is a strong, complete answer even without split-type extensibility — describe the `SplitStrategy` refactor verbally.
+
 ## Step 3 — The bad first draft
 
 ```go

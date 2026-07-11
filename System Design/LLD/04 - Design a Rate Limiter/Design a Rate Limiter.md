@@ -24,6 +24,45 @@ status: reference-quality
 
 Support swapping the underlying algorithm (token bucket for one API, a stricter sliding window for another) **without changing any calling code.** Thread-safe under concurrent calls from multiple goroutines.
 
+> [!example]+ 🪜 How to build this live, step by step (interview execution order, with code)
+> This is a shorter problem than most LLD questions — you can afford to build the "wrong" version deliberately before refactoring.
+>
+> **Checkpoint 1 (~10-12 min) — one algorithm, hardcoded, no interface.** This is exactly the bad draft in Step 3 below: token bucket logic baked directly into `RateLimiter.Allow`. Get it fully correct and running first — token bucket alone, with refill math working — before thinking about a second algorithm at all.
+> ```go
+> type RateLimiter struct {
+>     mu       sync.Mutex
+>     buckets  map[string]*bucket
+>     rate     float64
+>     capacity float64
+> }
+> // Allow(clientID) checks/refills/decrements one bucket — see Step 3.
+> ```
+> **Pattern used: none.** A single, correct algorithm beats a half-built interface with two broken implementations behind it.
+>
+> **Checkpoint 2 (~10 min) — once asked "what about a stricter limiter for payments," refactor into Strategy.**
+> ```go
+> // LimiterStrategy — the Strategy pattern. Replaces the single
+> // hardcoded algorithm from Checkpoint 1.
+> type LimiterStrategy interface {
+>     Allow(clientID string) bool
+> }
+>
+> type RateLimiter struct {
+>     strategy LimiterStrategy // now a thin wrapper — Dependency Inversion
+> }
+>
+> func (r *RateLimiter) Allow(clientID string) bool {
+>     return r.strategy.Allow(clientID)
+> }
+> ```
+> **Pattern used: Strategy.** Move the Checkpoint 1 token-bucket code, unchanged in logic, into a `TokenBucketStrategy` that implements this interface.
+>
+> **Checkpoint 3 (~10 min) — implement the second algorithm.** Write `SlidingWindowCounterStrategy` (full version in Step 6) — same interface, genuinely different math (weights the previous window's count instead of a raw timestamp log).
+>
+> **Checkpoint 4 (remaining time, or if asked) — the distributed jump.** No new code needed — describe verbally: the `map[string]*bucket` here is local, in-process memory; [[HLD/02 - Design a Rate Limiter/Design a Rate Limiter|the HLD chapter]] replaces it with Redis state and turns the check-refill-decrement sequence into one atomic Lua script, since multiple *servers* (not just goroutines) can now race on the same client's bucket.
+>
+> **If you're short on time:** stop after Checkpoint 1. A single, fully correct token-bucket limiter is a complete, working answer — describe the Strategy extraction verbally as how you'd support a second algorithm without touching this code.
+
 ## Step 3 — The bad first draft
 
 ```go

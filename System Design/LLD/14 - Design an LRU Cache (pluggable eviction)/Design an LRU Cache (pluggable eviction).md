@@ -24,6 +24,49 @@ status: reference-quality
 
 `O(1)`-average `Get`/`Put`. Configurable eviction policy at construction time. Thread-safe under concurrent access.
 
+> [!example]+ 🪜 How to build this live, step by step (interview execution order, with code)
+> **Checkpoint 1 (~10-12 min) — plain LRU, no pluggability yet.** This is the mechanics from [[DSA/Linked List/LRU Cache (LeetCode #146)|the DSA LRU Cache note]] — if that's not already fast to write from memory, drill it separately before this chapter's actual point (the wrapper) is worth attempting live.
+> ```go
+> type Cache struct {
+>     capacity int
+>     data     map[string]interface{}
+>     order    *list.List
+>     elements map[string]*list.Element
+> }
+>
+> func (c *Cache) Get(key string) (interface{}, bool) {
+>     if elem, ok := c.elements[key]; ok {
+>         c.order.MoveToFront(elem)
+>         return c.data[key], true
+>     }
+>     return nil, false
+> }
+> ```
+> **Pattern used: none.** LRU only, hardcoded — correctness of `Get`/`Put`/eviction matters more right now than any abstraction.
+>
+> **Checkpoint 2 (~8 min) — once asked "what if we need LFU too," extract `EvictionPolicy`.**
+> ```go
+> // EvictionPolicy — the Strategy pattern. Cache never encodes a
+> // specific eviction algorithm itself.
+> type EvictionPolicy interface {
+>     RecordAccess(key string)
+>     RecordInsertion(key string)
+>     Evict() (key string, ok bool)
+>     Remove(key string)
+> }
+> ```
+> **Pattern used: Strategy.** Move Checkpoint 1's `order`/`elements` fields and logic, unchanged, into an `LRUPolicy` implementing this interface — `Cache` now only holds `map[string]interface{}` plus a `policy EvictionPolicy`.
+>
+> **Checkpoint 3 (~8 min) — implement `LFUPolicy`, prove the swap works.**
+> ```go
+> cache.NewCache(2, cache.NewLFUPolicy()) // the ENTIRE change needed
+> ```
+> No new pattern — this checkpoint's whole value is demonstrating `Cache.Get`/`Put` never changed at all.
+>
+> **Checkpoint 4 (remaining time, or if asked) — thread safety.** Add the `sync.Mutex` from Step 5 around `Get`/`Put`.
+>
+> **If you're short on time:** stop after Checkpoint 2. A correct LRU cache behind an `EvictionPolicy` interface — even with only one concrete implementation — proves the design; LFU is "the same shape again," fine to describe rather than fully type out.
+
 ## Step 3 — The bad first draft (kept brief)
 
 A `Cache` struct with one eviction algorithm hardcoded directly inline — the same Open/Closed shape covered many times already. This chapter's value isn't re-teaching that shape; it's the pluggability wrapper itself.

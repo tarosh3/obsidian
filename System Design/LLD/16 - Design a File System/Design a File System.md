@@ -21,6 +21,49 @@ status: reference-quality
 
 Create files/directories in a hierarchy. Navigate the tree. Compute the total size of a directory, recursively including all nested files. List contents.
 
+> [!example]+ 🪜 How to build this live, step by step (interview execution order, with code)
+> **Checkpoint 1 (~5-6 min) — the interface + `File` alone, before `Directory` exists.**
+> ```go
+> type FileSystemNode interface {
+>     Name() string
+>     Size() int64
+> }
+>
+> type File struct {
+>     name string
+>     size int64
+> }
+>
+> func (f *File) Size() int64 { return f.size }
+> ```
+> **Pattern used: none yet — but name it as you write the interface.** Say: *"I'm making a leaf and a container share one interface up front, because I know both need to answer `Size()` the same way — this is heading toward Composite."*
+>
+> **Checkpoint 2 (~10 min) — `Directory`, the actual Composite payoff.**
+> ```go
+> type Directory struct {
+>     name     string
+>     children []FileSystemNode // holds Files AND other Directories, uniformly
+> }
+>
+> // Size recurses through every child — a File contributes directly;
+> // a nested Directory recurses into its OWN Size(). Directory never
+> // checks what kind of node a child is.
+> func (d *Directory) Size() int64 {
+>     var total int64
+>     for _, child := range d.children {
+>         total += child.Size()
+>     }
+>     return total
+> }
+> ```
+> **Pattern used: Composite.** This is the checkpoint that actually demonstrates the design — build a small tree (root → docs/photos → files) and print `root.Size()` live to prove the recursion works with zero type-checking anywhere.
+>
+> **Checkpoint 3 (~5 min) — `Add` and `Find` for navigation.** Mechanical, low-risk — a good checkpoint to bank once Checkpoint 2's recursion is demoed and working.
+>
+> **Checkpoint 4 (remaining time, or if asked) — symlinks / cycle detection, verbally.** No code needed unless asked: describe tracking visited node identities in a `map` during one traversal, skipping anything already seen — the standard cycle-detection idea, applied here since a symlink breaks the "strictly a tree" assumption everything above relies on.
+>
+> **If you're short on time:** stop after Checkpoint 2. `FileSystemNode` + working `File` + working recursive `Directory.Size()` on a small tree IS the entire Composite pattern, correctly demonstrated — `Add`/`Find` are minor plumbing you can describe rather than type.
+
 ## Step 3 — The bad first draft
 
 Separate `File` and `Directory` types with **no common interface**. Any code that needs to "process this node, whatever it is" — computing total size, for instance — needs explicit type-checking at every call site:

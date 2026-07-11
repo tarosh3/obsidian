@@ -31,6 +31,84 @@ status: reference-quality
 
 ---
 
+> [!example]+ 🪜 How to build this live, step by step (interview execution order, with code)
+> **The one rule that matters most:** get something *running end-to-end* before you write a single interface. A working, dumb version beats a beautiful set of interfaces that don't compile together yet. Every checkpoint below is real, compiling code and a genuine stopping point — running out of time after any checkpoint still looks like a finished (if narrower) answer, not an abandoned one.
+>
+> **Checkpoint 1 (~8-10 min) — one vehicle type, zero patterns.** No interfaces yet, on purpose — you don't know which abstraction you need until something hurts.
+> ```go
+> type ParkingSpot struct {
+>     ID       string
+>     Occupied bool
+> }
+>
+> type ParkingLot struct {
+>     spots []*ParkingSpot
+> }
+>
+> func (p *ParkingLot) ParkVehicle(plate string) *ParkingSpot {
+>     for _, spot := range p.spots {
+>         if !spot.Occupied {
+>             spot.Occupied = true
+>             return spot
+>         }
+>     }
+>     return nil
+> }
+>
+> func (p *ParkingLot) ExitVehicle(spot *ParkingSpot, hours int) float64 {
+>     spot.Occupied = false
+>     return float64(hours) * 10 // flat rate, hardcoded — fine for now
+> }
+> ```
+> **Pattern used: none.** That's deliberate. This compiles and runs in under 10 minutes — a live thing to demo and extend beats a correct-looking `Vehicle` interface with nothing behind it yet.
+>
+> **Checkpoint 2 (~8-10 min) — multiple vehicle types, still no pattern.** Extend the *same* code with `if/else` per vehicle type — this is intentionally the "bad" shape from Step 3 below:
+> ```go
+> func (p *ParkingLot) CalculateFee(vehicleType string, hours int) float64 {
+>     if vehicleType == "motorcycle" {
+>         return float64(hours) * 10
+>     } else if vehicleType == "car" {
+>         return float64(hours) * 20
+>     } else if vehicleType == "bus" {
+>         return float64(hours) * 50
+>     }
+>     return 0
+> }
+> ```
+> **Pattern used: still none.** Say out loud what you're feeling: *"this if/else is going to grow every time we add a vehicle type or a new pricing rule — I'd want to pull this behind an interface."* Naming the pain before fixing it is a stronger signal than declaring a pattern with no felt problem behind it.
+>
+> **Checkpoint 3 (~10-15 min) — refactor into Strategy.** Now introduce the interface:
+> ```go
+> // PricingStrategy — the Strategy pattern. ParkingLot will depend on
+> // THIS, never on a concrete pricing struct.
+> type PricingStrategy interface {
+>     CalculateFee(duration time.Duration) float64
+> }
+>
+> type HourlyPricingStrategy struct{ RatePerHour float64 }
+>
+> func (h HourlyPricingStrategy) CalculateFee(d time.Duration) float64 {
+>     return math.Ceil(d.Hours()) * h.RatePerHour
+> }
+> ```
+> **Pattern used: Strategy.** One interface, one method, a small struct per pricing rule. Wire a `PricingStrategyFactory` (a second, smaller pattern — **Factory**) that maps `VehicleType -> PricingStrategy` so `ParkingLot` never branches on vehicle type again. Full multi-strategy implementation is in Step 9.
+>
+> **Checkpoint 4 (remaining time, or if asked) — concurrency.** Add a mutex so two vehicles can't claim the same spot:
+> ```go
+> func (s *ParkingSpot) TryOccupy() bool {
+>     s.mu.Lock()
+>     defer s.mu.Unlock()
+>     if s.Occupied {
+>         return false
+>     }
+>     s.Occupied = true
+>     return true
+> }
+> ```
+> **No new pattern here** — just the thread-safety discipline every earlier checkpoint was missing. If asked, talk through reserved/VIP spots or time-of-day pricing as verbal extensions (Step 8).
+>
+> **If you're short on time:** stop after Checkpoint 2. You'll have multiple vehicle types and fee calculation genuinely working end-to-end, and you can describe the Strategy refactor verbally as "what I'd do next and why" — that reads as a complete answer at reduced scope, not an unfinished one.
+
 ## Step 3 — The bad first draft
 
 Here's the version most people write first — and it's not *wrong*, exactly. It works for the demo. It's what breaks under real requirements that matters.

@@ -21,6 +21,70 @@ status: reference-quality
 
 A board of a fixed size (standard: 100 cells). Some cells are **snake heads** — landing there sends the player *backward* to a tail cell. Some cells are **ladder bottoms** — landing there sends the player *forward* to a top cell. Players take turns rolling a die and moving forward by the roll. Overshooting the final cell forfeits the move (standard official rule — must land *exactly* on the last cell). First player to land exactly on the final cell wins.
 
+> [!example]+ 🪜 How to build this live, step by step (interview execution order, with code)
+> **Checkpoint 1 (~8 min) — one player, no board size limit checks, no dice abstraction.**
+> ```go
+> type Player struct {
+>     Position int
+> }
+>
+> func Move(p *Player, roll int) {
+>     p.Position += roll // no overshoot rule, no snakes/ladders yet
+> }
+> ```
+> **Pattern used: none.** Get one player moving forward across turns before worrying about the board at all.
+>
+> **Checkpoint 2 (~8 min) — snakes AND ladders as TWO separate maps, deliberately, to feel the duplication.**
+> ```go
+> func resolvePosition(pos int, snakes, ladders map[int]int) int {
+>     if dest, ok := snakes[pos]; ok { return dest }
+>     if dest, ok := ladders[pos]; ok { return dest }
+>     return pos
+> }
+> ```
+> **Pattern used: none — and say the insight out loud as you write it, not after:** *"these do the exact same thing — land here, get sent there — the only difference is direction. I don't think I need two maps."*
+>
+> **Checkpoint 3 (~5 min) — unify into one `jumps map[int]int`.**
+> ```go
+> // Board.jumps handles BOTH snakes and ladders as ONE concept — a
+> // snake's source > destination, a ladder's source < destination,
+> // and nothing downstream needs to know which is which.
+> type Board struct {
+>     size  int
+>     jumps map[int]int
+> }
+>
+> func (b *Board) Resolve(position int) int {
+>     if dest, ok := b.jumps[position]; ok {
+>         return dest
+>     }
+>     return position
+> }
+> ```
+> This checkpoint alone is worth more than most of the rest of the chapter — it's a modeling insight, not a pattern, and it's the single best thing to volunteer unprompted.
+>
+> **Checkpoint 4 (~8 min) — refactor dice into Strategy, wire the full turn loop.**
+> ```go
+> // Dice — Strategy. Swap fair/loaded/multi-dice without touching Game.
+> type Dice interface {
+>     Roll() int
+> }
+> ```
+> **Pattern used: Strategy.** Wire `Game.PlayTurn` — roll, compute target, overshoot check (stay put if `target > board.Size()`), resolve jumps, check win, advance turn.
+>
+> **Checkpoint 5 (remaining time, or if asked) — board-construction validation.**
+> ```go
+> // Reject a jump whose destination is ITSELF a jump source — a
+> // chained snake-into-ladder is a real, easy-to-miss bug caught here,
+> // not discovered mid-game.
+> if _, chained := b.jumps[destination]; chained {
+>     return errors.New("destination cell is itself a jump source")
+> }
+> ```
+> No new pattern — just a real correctness detail worth naming even if you don't have time to fully implement it.
+>
+> **If you're short on time:** stop after Checkpoint 3. The unified `jumps` map with correct resolution, even with dice still hardcoded, demonstrates the entire modeling insight this question is actually testing — describe the Dice Strategy verbally as "swap the roll source, zero changes to Game."
+
 ## Step 3 — The bad first draft
 
 Two separate maps, checked via two separate branches every time a player moves:

@@ -24,6 +24,56 @@ status: reference-quality
 
 Join/leave a room. Per-participant mute/video state. Broadcast state changes to all **other** participants in the **same** room — never globally. A host role with elevated permissions (mute-all, remove participant).
 
+> [!example]+ 🪜 How to build this live, step by step (interview execution order, with code)
+> **Checkpoint 1 (~6-8 min) — Join/Leave only, no broadcasting at all.**
+> ```go
+> type Room struct {
+>     participants map[string]*Participant
+> }
+>
+> func (r *Room) Join(participantID string, isHost bool) {
+>     r.participants[participantID] = &Participant{ID: participantID, IsHost: isHost}
+> }
+> ```
+> **Pattern used: none.** Prove participants can join/leave and the map reflects it correctly before adding any notification.
+>
+> **Checkpoint 2 (~5 min) — bad draft, kept brief.** Each state-changing method (`Mute`, `Join`, `Leave`) loops participants and pushes updates inline, duplicated per method. Narrate the coupling rather than fully building it: *"if I add a call-recording service that also needs every state change, I'm editing every one of these methods individually."*
+>
+> **Checkpoint 3 (~10-12 min) — refactor into room-SCOPED Observer. State the scoping distinction unprompted.**
+> ```go
+> // RoomObserver — Observer, but SCOPED to one Room, not global.
+> // An event in Room A must never reach an observer of Room B.
+> type RoomObserver interface {
+>     OnRoomEvent(event RoomEvent)
+> }
+>
+> type Room struct {
+>     participants map[string]*Participant
+>     observers    []RoomObserver // owned per-Room, not shared globally
+> }
+>
+> func notifyAll(observers []RoomObserver, event RoomEvent) {
+>     for _, o := range observers {
+>         o.OnRoomEvent(event)
+>     }
+> }
+> ```
+> **Pattern used: Observer (room-scoped variant).** Say explicitly how this differs from the Notification System chapter's single global `EventPublisher` — that's the single strongest thing to volunteer in this question.
+>
+> **Checkpoint 4 (remaining time, or if asked) — host-only `MuteAll`, permission check woven into the action.**
+> ```go
+> func (r *Room) MuteAll(requesterID string) error {
+>     requester, ok := r.participants[requesterID]
+>     if !ok || !requester.IsHost {
+>         return ErrNotHost // permission check IS the first line, not bolted on after
+>     }
+>     // mute everyone else, notify
+> }
+> ```
+> **No new pattern** — but this is the second real signal in the chapter: authorization living directly inside the action it guards, not as a separate middleware-style layer floating outside the object model.
+>
+> **If you're short on time:** stop after Checkpoint 3. Join/Leave/Mute with room-scoped Observer notification working, and the scoping distinction stated clearly, is a complete answer — describe `MuteAll`'s permission check verbally as the next addition.
+
 ## Step 3 — The bad first draft (kept brief)
 
 A `Room` struct with a flat participant list, where every state-changing method (`Mute`, `Join`, `Leave`) directly loops over all participants and pushes an update **inline within the same method that changed the state**. Tightly couples "what changed" with "how everyone finds out" — adding a new kind of listener (e.g. a call-recording service that also needs every state change) means editing every single state-mutation method individually.

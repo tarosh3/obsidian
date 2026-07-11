@@ -24,6 +24,65 @@ status: reference-quality
 
 Create single or recurring events. Cancel/modify one occurrence without affecting the series. Detect scheduling conflicts for a shared resource.
 
+> [!example]+ 🪜 How to build this live, step by step (interview execution order, with code)
+> **Checkpoint 1 (~6 min) — a single one-off event, no recurrence at all.**
+> ```go
+> type Event struct {
+>     ID         string
+>     Title      string
+>     Start, End time.Time
+> }
+> ```
+> **Pattern used: none.** No `Rule`, no exceptions — just prove you can represent and query one concrete event before touching recurrence.
+>
+> **Checkpoint 2 (~5 min) — bad draft, kept brief.** An `isRecurring bool` + `interval int`/`unit string` fields, with expansion logic re-implemented at every call site that needs occurrences ("today's events," "this week's events"). Narrate the duplication rather than fully writing it out — the pain is obvious quickly.
+>
+> **Checkpoint 3 (~10 min) — refactor into `RecurrenceRule` Strategy, one implementation.**
+> ```go
+> // RecurrenceRule — Strategy. Each rule type owns its own expansion,
+> // computed once, never duplicated across call sites.
+> type RecurrenceRule interface {
+>     Occurrences(seriesStart, from, to time.Time) []time.Time
+> }
+>
+> type DailyRule struct {
+>     IntervalDays int
+>     Until        time.Time
+> }
+> ```
+> **Pattern used: Strategy.** Get `DailyRule.Occurrences` correct — including the `Until` bound — before adding a second rule shape.
+>
+> **Checkpoint 4 (~10 min) — `WeeklyOnDaysRule` + per-occurrence exceptions. This is the checkpoint with the real signal.**
+> ```go
+> // exceptions is keyed by Unix() timestamp, NOT time.Time itself.
+> exceptions map[int64]bool
+>
+> func (e *Event) CancelOccurrence(date time.Time) {
+>     e.exceptions[date.Unix()] = true
+> }
+> ```
+> **Say the `time.Time`-as-map-key gotcha unprompted:** two `time.Time` values for the same instant can compare unequal via `==` due to differing monotonic-clock readings or `*Location` pointers — keying by `.Unix()` sidesteps it entirely. This single detail is worth more than most of the rest of the chapter combined if you can state it without being asked.
+>
+> **Checkpoint 5 (remaining time, or if asked) — shared-resource conflict detection.**
+> ```go
+> // Same atomic check-then-book discipline as BookMyShow and Uber,
+> // applied here to a time slot instead of a seat or a driver.
+> func (r *ResourceCalendar) TryBook(start, end time.Time) error {
+>     r.mu.Lock()
+>     defer r.mu.Unlock()
+>     for _, b := range r.booked {
+>         if start.Before(b.end) && b.start.Before(end) {
+>             return ErrConflict
+>         }
+>     }
+>     r.booked = append(r.booked, struct{ start, end time.Time }{start, end})
+>     return nil
+> }
+> ```
+> **No new pattern** — explicitly connect it back to the exact same check-and-claim fix already proven in two earlier chapters, applied to a genuinely different resource type.
+>
+> **If you're short on time:** stop after Checkpoint 4. A working `RecurrenceRule` Strategy with two implementations, plus the exceptions gotcha stated correctly, is a complete and strong answer — describe conflict detection verbally as "the same atomic pattern as BookMyShow."
+
 ## Step 3 — The bad first draft (kept brief)
 
 An `Event` struct with an `isRecurring bool` and ad-hoc fields (`interval int`, `unit string`), with recurrence-expansion logic **duplicated inline** at every call site that needs occurrences (e.g. "today's events" and "this week's events" each re-implementing the same expansion). Adding a new recurrence pattern means finding and editing every duplicate.
