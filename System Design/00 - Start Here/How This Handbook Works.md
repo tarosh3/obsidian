@@ -74,7 +74,7 @@ Interview question → requirement clarification → **bad first draft** (the na
 
 Chapters are written **one at a time, on request** — say *"write [chapter name]"* and it's produced to the full standard above. The three below are already written as the reference standard for everything that follows.
 
-### ✅ Written (reference-quality, read these to calibrate the bar) — 72 chapters so far
+### ✅ Written (reference-quality, read these to calibrate the bar) — 76 chapters so far
 
 > [!success] Second gap-audit pass: ACID, SOLID, Design Patterns
 > Added [[CS Fundamentals/Databases/ACID & Isolation Levels|ACID & Isolation Levels]] (previously only a broken glossary stub), [[CS Fundamentals/Design Principles/SOLID Principles|SOLID Principles]], and [[CS Fundamentals/Design Principles/Design Patterns Cheat Sheet|Design Patterns Cheat Sheet]] (all 23 GoF patterns — 8 with full LLD chapter treatment, 15 as cheat-sheet-level entries) — consolidating principles that were previously taught correctly but only scattered inline across individual LLD chapters.
@@ -152,6 +152,10 @@ Chapters are written **one at a time, on request** — say *"write [chapter name
 | LLD | [[LLD/23 - Design Snake and Ladder/Design Snake and Ladder\|Design Snake and Ladder]] | ✅ Strategy (swappable dice), snake/ladder unified as one "jump" concept, intentionally no locking |
 | HLD | [[HLD/24 - Design an Analytics Aggregation System/Design an Analytics Aggregation System\|Design an Analytics Aggregation System]] | ✅ HyperLogLog, Count-Min Sketch, mergeable sketches, windowed counting |
 | HLD | [[HLD/25 - Design a Search Engine/Design a Search Engine\|Design a Search Engine (Google Search)]] | ✅ Inverted index, TF-IDF/BM25, posting-list compression, sharded search |
+| LLD | [[LLD/24 - Design Twitter/Design Twitter\|Design Twitter]] | ✅ Heap-based K-way timeline merge (Merge K Sorted Lists), idempotent like/retweet |
+| LLD | [[LLD/25 - Design Instagram/Design Instagram\|Design Instagram]] | ✅ Interface Segregation (Likeable/Commentable), lazy story expiry reused from BookMyShow |
+| LLD | [[LLD/26 - Design YouTube/Design YouTube\|Design YouTube]] | ✅ Lost-update race fixed with sync/atomic (not a mutex), per-user view dedup, Observer reused for subscriptions |
+| LLD | [[LLD/27 - Design WhatsApp/Design WhatsApp\|Design WhatsApp]] | ✅ Per-recipient read receipts (group-chat fix), guarded-enum-not-State judgment call reused a third time |
 
 ### 🎯 The full LLD checklist — 20 interview questions (all with complete compilable Go)
 
