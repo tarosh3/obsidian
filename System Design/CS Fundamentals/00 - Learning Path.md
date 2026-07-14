@@ -30,8 +30,8 @@ How a single machine shares its CPU and memory across many concurrent programs �
 | # | Chapter | Status |
 |---|---|---|
 | 1.1 | [[CS Fundamentals/Operating Systems/Processes, Threads & Context Switching\|Processes, Threads & Context Switching]] | ✅ |
-| 1.2 | Memory Management & Virtual Memory (paging, page faults, swapping) | 🔜 |
-| 1.3 | I/O Models (blocking, non-blocking, async, epoll/io_uring) | 🔜 |
+| 1.2 | [[CS Fundamentals/Operating Systems/Memory Management & Virtual Memory\|Memory Management & Virtual Memory]] | ✅ |
+| 1.3 | [[CS Fundamentals/Operating Systems/I-O Models - Blocking, Non-Blocking, and Async\|I/O Models: Blocking, Non-Blocking & Async]] | ✅ |
 
 ## Tier 2 — Networking
 
@@ -44,7 +44,7 @@ How machines talk to each other — the layer every distributed system, HLD chap
 | 2.3 | [[CS Fundamentals/Networking/Load Balancing\|Load Balancing]] | ✅ |
 | 2.4 | [[CS Fundamentals/Networking/API Gateway\|API Gateway]] | ✅ |
 | 2.5 | [[CS Fundamentals/Networking/CDN Internals\|CDN Internals]] | ✅ |
-| 2.6 | Reverse Proxy (dedicated — currently folded into Load Balancing/API Gateway) | 🔜 |
+| 2.6 | [[CS Fundamentals/Networking/Reverse Proxy\|Reverse Proxy]] | ✅ |
 
 ## Tier 3 — Databases & Storage Engines
 
