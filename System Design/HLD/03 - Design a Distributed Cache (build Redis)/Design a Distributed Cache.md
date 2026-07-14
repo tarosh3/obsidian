@@ -29,7 +29,7 @@ Assume 10M keys, ~1KB average value → **10GB** of logical data. With replicati
 
 ## Step 4 — Building it incrementally
 
-**v0 — a single node.** A hash map in memory, exactly like a single Redis instance (see [[CS Fundamentals/Caching/Redis Internals|Redis Internals]] for that node's own internal mechanics). Works until the dataset exceeds one machine's RAM, or throughput exceeds one machine's ceiling.
+**v0 — a single node.** A hash map in memory, exactly like a single Redis instance (see [[CS Fundamentals/04 - Caching/Redis Internals|Redis Internals]] for that node's own internal mechanics). Works until the dataset exceeds one machine's RAM, or throughput exceeds one machine's ceiling.
 
 **Need to scale beyond one node → partition the keyspace.** The naive approach, `hash(key) % N`, breaks the moment `N` changes: adding or removing a single node remaps *almost every key* to a different node, causing a massive, unnecessary cache-wide miss storm. The fix is [[Glossary/Consistent Hashing|consistent hashing]]: map both keys and nodes onto a conceptual ring; a key belongs to the next node clockwise from its hash position. Adding a node only takes over the keys between it and its counterclockwise neighbor — a small, bounded fraction of the total keyspace, not "everything."
 
@@ -50,7 +50,7 @@ Assume 10M keys, ~1KB average value → **10GB** of logical data. With replicati
 
 **Synchronous replication:** a write is only acknowledged to the client once the replica(s) confirm receipt too. Safer (no data loss window on primary failure), but adds real latency to every write. **Asynchronous replication:** the primary acknowledges immediately, replicating in the background — much faster writes, but a replica can lag, and a primary crash between "ack sent" and "replicated" genuinely loses that write.
 
-> [!tip] This is [[CS Fundamentals/Distributed Systems/CAP Theorem & PACELC|PACELC's "Else" branch]], concretely, not in the abstract
+> [!tip] This is [[CS Fundamentals/06 - Distributed Systems/CAP Theorem & PACELC|PACELC's "Else" branch]], concretely, not in the abstract
 > There's no partition happening here at all — this is purely the everyday latency-vs-consistency choice PACELC describes as the *normal-operation* tradeoff. Most distributed caches default to **asynchronous** replication specifically because a *cache* rarely needs to be the durable source of truth — the underlying database already is — so trading a small data-loss window for meaningfully lower write latency is usually the right call for this specific use case, even though the identical tradeoff might resolve differently for a primary datastore.
 
 ### The hot-key problem — capacity that "should be enough" isn't
@@ -119,4 +119,4 @@ sequenceDiagram
 > Rebalancing during scale-up/down (migrating keys to/from a newly added or removed node) causes a **temporary latency blip** for keys mid-migration — worth explicitly monitoring during planned scaling events, and worth designing the migration to happen gradually/throttled rather than all at once, to avoid a self-inflicted spike right when you're trying to add capacity to handle load.
 
 ---
-*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[CS Fundamentals/Caching/Redis Internals|Redis Internals]] · [[CS Fundamentals/Distributed Systems/CAP Theorem & PACELC|CAP Theorem & PACELC]] · [[Glossary/Consistent Hashing|Consistent Hashing]]*
+*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[CS Fundamentals/04 - Caching/Redis Internals|Redis Internals]] · [[CS Fundamentals/06 - Distributed Systems/CAP Theorem & PACELC|CAP Theorem & PACELC]] · [[Glossary/Consistent Hashing|Consistent Hashing]]*

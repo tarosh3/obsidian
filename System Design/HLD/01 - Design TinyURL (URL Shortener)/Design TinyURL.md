@@ -205,7 +205,7 @@ sequenceDiagram
 > Custom aliases break the counter-based generation scheme — a user-chosen string isn't derived from the counter, so it needs its own uniqueness check. Solution: a **unique constraint on the short_code column** at the database level, and an insert that relies on that constraint to atomically reject a duplicate (returning "alias taken" to the user) rather than a racy check-then-insert in application code.
 
 > [!quote]- "How do you track click analytics without slowing down the hot redirect path?"
-> Never make the redirect wait on an analytics write. Fire-and-forget publish a click event to a Kafka topic (see [[CS Fundamentals/Messaging & Streaming/Kafka Internals|Kafka Internals]]) and return the 302 immediately — the analytics pipeline consumes from Kafka completely independently, on its own time, with zero impact on redirect latency even if the analytics pipeline is slow or briefly down.
+> Never make the redirect wait on an analytics write. Fire-and-forget publish a click event to a Kafka topic (see [[CS Fundamentals/05 - Messaging & Streaming/Kafka Internals|Kafka Internals]]) and return the 302 immediately — the analytics pipeline consumes from Kafka completely independently, on its own time, with zero impact on redirect latency even if the analytics pipeline is slow or briefly down.
 
 > [!quote]- "What happens if the ID allocator service goes down?"
 > Because app servers pre-fetch a *block* of IDs (Step 4) rather than requesting one ID per write, they can keep generating short codes locally for as long as their current block lasts, even with the allocator fully down. The allocator itself should also run as a small HA cluster (2-3 nodes) rather than a single instance, since it's a shared dependency for every app server.
@@ -237,4 +237,4 @@ sequenceDiagram
 > Most short URLs stop receiving traffic entirely after some period. A background job identifying long-unused codes and moving their records to cheaper cold storage (or purging entirely, per a stated retention policy) keeps the active, cache-warmed dataset small relative to total historical volume — directly reducing both DB and cache footprint costs at scale.
 
 ---
-*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[CS Fundamentals/Messaging & Streaming/Kafka Internals|Kafka Internals]] · [[Glossary/Consistent Hashing|Consistent Hashing]] · [[Glossary/QPS|QPS]]*
+*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[CS Fundamentals/05 - Messaging & Streaming/Kafka Internals|Kafka Internals]] · [[Glossary/Consistent Hashing|Consistent Hashing]] · [[Glossary/QPS|QPS]]*

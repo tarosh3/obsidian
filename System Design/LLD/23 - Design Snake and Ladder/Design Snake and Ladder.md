@@ -357,4 +357,4 @@ func main() {
 > Add a `hasStarted bool` field to `Player`, and in `PlayTurn`, only apply the moved position if `player.hasStarted` is true or the roll is 6 (setting `hasStarted = true` on that roll) — a small, additive change that slots into the existing turn logic without touching `Board`, `Dice`, or the win-detection logic at all, which is exactly what a well-separated design should allow.
 
 ---
-*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[LLD/09 - Design Chess/Design Chess|Design Chess]] · [[LLD/10 - Design Tic-Tac-Toe with AI/Design Tic-Tac-Toe with AI|Design Tic-Tac-Toe with AI]] · [[CS Fundamentals/Design Principles/Design Patterns Cheat Sheet|Design Patterns Cheat Sheet]]*
+*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[LLD/09 - Design Chess/Design Chess|Design Chess]] · [[LLD/10 - Design Tic-Tac-Toe with AI/Design Tic-Tac-Toe with AI|Design Tic-Tac-Toe with AI]] · [[CS Fundamentals/10 - Design Principles/Design Patterns Cheat Sheet|Design Patterns Cheat Sheet]]*

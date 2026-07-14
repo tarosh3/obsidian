@@ -11,7 +11,7 @@ status: reference-quality
 > Build the *system-design* framing around Kafka's internals (already covered in full elsewhere) — capacity planning for partition count, the metadata/discovery problem new clients face, and controller election at the cluster level.
 
 > [!info] This chapter assumes you've read the internals chapter
-> Broker/partition/segment/ISR/leader-election/delivery-guarantees/log-compaction mechanics are covered in full in [[CS Fundamentals/Messaging & Streaming/Kafka Internals|Kafka Internals]] — this chapter doesn't re-derive any of that. It answers the *system-design* question: "design a system like this from scratch," focused on what that internals chapter doesn't cover — estimation, discovery, and cluster-level coordination.
+> Broker/partition/segment/ISR/leader-election/delivery-guarantees/log-compaction mechanics are covered in full in [[CS Fundamentals/05 - Messaging & Streaming/Kafka Internals|Kafka Internals]] — this chapter doesn't re-derive any of that. It answers the *system-design* question: "design a system like this from scratch," focused on what that internals chapter doesn't cover — estimation, discovery, and cluster-level coordination.
 
 ---
 
@@ -32,7 +32,7 @@ Assume 1M messages/sec average, ~1KB average message size → **~1GB/sec** aggre
 
 ## Step 4 — Building it incrementally (the parts unique to this chapter)
 
-**v0 — single-server append-only log.** The simplest possible durable queue. Breaks past one machine's throughput/storage ceiling, and is a single point of failure — the exact motivation for everything [[CS Fundamentals/Messaging & Streaming/Kafka Internals|the internals chapter]] describes (partitioning, replication, ISR).
+**v0 — single-server append-only log.** The simplest possible durable queue. Breaks past one machine's throughput/storage ceiling, and is a single point of failure — the exact motivation for everything [[CS Fundamentals/05 - Messaging & Streaming/Kafka Internals|the internals chapter]] describes (partitioning, replication, ISR).
 
 **The new problem this HLD framing surfaces: how does a client find the right broker?** A producer publishing to topic `orders`, partition 3, needs to know **which specific broker currently holds the leader** for that partition — and that can change at any time (broker failure, rebalancing). This is the **metadata / discovery problem**, and it's the piece worth deep-diving here specifically because the internals chapter treats it as a given rather than explaining the mechanism.
 
@@ -90,7 +90,7 @@ graph TD
 > [Use the metadata caching + `NotLeaderForPartition`-triggered refresh mechanism from Step 5 — this is the specific, concrete answer, not "it just knows."]
 
 > [!quote]- "What happens to in-flight publishes during a leader election — do they fail?"
-> Yes, briefly — publishes targeting a partition mid-election fail (or block, depending on client configuration) until the new leader is elected and metadata propagates. This is a genuine, bounded unavailability window — a live **CP choice**: the system favors correctness (never accepting a write that could be lost or conflict with the new leader's state) over availability during that specific window, consistent with [[CS Fundamentals/Distributed Systems/CAP Theorem & PACELC|CAP's]] framing.
+> Yes, briefly — publishes targeting a partition mid-election fail (or block, depending on client configuration) until the new leader is elected and metadata propagates. This is a genuine, bounded unavailability window — a live **CP choice**: the system favors correctness (never accepting a write that could be lost or conflict with the new leader's state) over availability during that specific window, consistent with [[CS Fundamentals/06 - Distributed Systems/CAP Theorem & PACELC|CAP's]] framing.
 
 > [!quote]- "How would you decide on partition count for a new topic?"
 > Divide target throughput by the realistic per-partition throughput ceiling (bounded by a single leader's disk/network capacity), and separately ensure the count meets the desired maximum consumer-group parallelism — then round up with headroom, since partition count can be increased later but never decreased.
@@ -98,7 +98,7 @@ graph TD
 ## Step 8 — Production experience
 
 > [!info] What to monitor
-> Under-replicated partitions / ISR shrinkage (from [[CS Fundamentals/Messaging & Streaming/Kafka Internals|Kafka Internals]], applied at the cluster level here). **Controller election frequency** — frequent re-elections are a strong signal of cluster instability (flapping brokers, network issues), not routine operation. Partition-to-broker assignment skew — an unevenly distributed partition count creates a hot broker even when the cluster's aggregate capacity looks fine on a dashboard.
+> Under-replicated partitions / ISR shrinkage (from [[CS Fundamentals/05 - Messaging & Streaming/Kafka Internals|Kafka Internals]], applied at the cluster level here). **Controller election frequency** — frequent re-elections are a strong signal of cluster instability (flapping brokers, network issues), not routine operation. Partition-to-broker assignment skew — an unevenly distributed partition count creates a hot broker even when the cluster's aggregate capacity looks fine on a dashboard.
 
 ---
-*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[CS Fundamentals/Messaging & Streaming/Kafka Internals|Kafka Internals]] · [[Glossary/Raft (Consensus)|Raft]] · [[CS Fundamentals/Distributed Systems/CAP Theorem & PACELC|CAP Theorem & PACELC]]*
+*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[CS Fundamentals/05 - Messaging & Streaming/Kafka Internals|Kafka Internals]] · [[Glossary/Raft (Consensus)|Raft]] · [[CS Fundamentals/06 - Distributed Systems/CAP Theorem & PACELC|CAP Theorem & PACELC]]*

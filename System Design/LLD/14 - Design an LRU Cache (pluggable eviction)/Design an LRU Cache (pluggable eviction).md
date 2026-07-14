@@ -374,4 +374,4 @@ func main() {
 > Both are correct and `O(1)`; using the standard library here keeps this chapter's code focused on the *wrapper* being taught (pluggable eviction), rather than re-deriving linked-list mechanics already covered in full elsewhere — worth being explicit about this choice if asked, since hand-rolling it is equally valid and sometimes expected depending on what the interviewer is actually probing for.
 
 ---
-*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[DSA/Linked List/LRU Cache (LeetCode #146)|DSA — LRU Cache]] · [[CS Fundamentals/Caching/Caching Strategies|Caching Strategies]]*
+*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[DSA/Linked List/LRU Cache (LeetCode #146)|DSA — LRU Cache]] · [[CS Fundamentals/04 - Caching/Caching Strategies|Caching Strategies]]*

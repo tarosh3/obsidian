@@ -29,7 +29,7 @@ A **collection** groups documents loosely (analogous to a table), but individual
 
 ## 4. Replication — replica sets and automatic failover
 
-MongoDB uses **replica sets**: one primary, multiple secondaries — conceptually the same leader-follower replication pattern covered generally elsewhere, with MongoDB-specific mechanics: automatic **failover** via an election protocol among secondaries when the primary becomes unreachable, conceptually similar to [[Glossary/Raft (Consensus)|Raft-style consensus]] (a distinct implementation, but the same underlying idea — a majority of nodes must agree on the new primary). Reads can be routed to secondaries (trading consistency for read scalability — a real, direct [[CS Fundamentals/Distributed Systems/CAP Theorem & PACELC|PACELC]] tradeoff) or required to be majority-committed for stronger consistency guarantees, at added latency cost.
+MongoDB uses **replica sets**: one primary, multiple secondaries — conceptually the same leader-follower replication pattern covered generally elsewhere, with MongoDB-specific mechanics: automatic **failover** via an election protocol among secondaries when the primary becomes unreachable, conceptually similar to [[Glossary/Raft (Consensus)|Raft-style consensus]] (a distinct implementation, but the same underlying idea — a majority of nodes must agree on the new primary). Reads can be routed to secondaries (trading consistency for read scalability — a real, direct [[CS Fundamentals/06 - Distributed Systems/CAP Theorem & PACELC|PACELC]] tradeoff) or required to be majority-committed for stronger consistency guarantees, at added latency cost.
 
 ## 5. Sharding — and the shard-key mistake that creates a hot shard
 
@@ -61,4 +61,4 @@ Needing **multi-document ACID transactions across many collections at high throu
 > A common approach is a **compound shard key** combining a well-distributed prefix (e.g. a hashed or bucketed field) with the naturally-ordered field as a secondary component — spreading writes across shards while still allowing efficient range scans within each shard's slice of the ordered field.
 
 ---
-*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[CS Fundamentals/Distributed Systems/CAP Theorem & PACELC|CAP Theorem & PACELC]] · [[Glossary/Raft (Consensus)|Raft]] · [[HLD/03 - Design a Distributed Cache (build Redis)/Design a Distributed Cache|Design a Distributed Cache]] (hot-key parallel)*
+*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[CS Fundamentals/06 - Distributed Systems/CAP Theorem & PACELC|CAP Theorem & PACELC]] · [[Glossary/Raft (Consensus)|Raft]] · [[HLD/03 - Design a Distributed Cache (build Redis)/Design a Distributed Cache|Design a Distributed Cache]] (hot-key parallel)*

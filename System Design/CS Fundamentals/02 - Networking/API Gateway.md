@@ -19,7 +19,7 @@ Every HLD chapter in this book has assumed "a request arrives at the system" wit
 ## What it actually does
 
 - **Routing** — maps an external request path to the correct internal service.
-- **Authentication/authorization** — verifies the caller once, at the edge, using [[CS Fundamentals/Security/Authentication & Authorization|the auth mechanisms already covered]] — internal services trust the gateway's verification rather than each re-implementing it.
+- **Authentication/authorization** — verifies the caller once, at the edge, using [[CS Fundamentals/08 - Security/Authentication & Authorization|the auth mechanisms already covered]] — internal services trust the gateway's verification rather than each re-implementing it.
 - **Rate limiting** — the actual enforcement point for [[HLD/02 - Design a Rate Limiter/Design a Rate Limiter|the Rate Limiter chapter's]] logic, applied per-client at the boundary before requests even reach internal services.
 - **TLS termination** — decrypts HTTPS once at the edge; internal traffic can run plain (inside a trusted network) or re-encrypted via mTLS for service-to-service.
 - **Request/response transformation** — adapting a public API shape to whatever internal services actually expose, so internal refactors don't break external clients.
@@ -44,7 +44,7 @@ graph TD
 > [!bug] A gateway accumulating business logic defeats its own purpose
 > It's tempting to keep adding request-shaping logic, orchestration, even business rules into the gateway over time — it's the one place that sees every request. Left unchecked, the gateway becomes a second monolith that every team's deploys funnel through, recreating the coupling microservices were meant to remove. The gateway should stay a thin, cross-cutting layer — routing and policy, not business logic.
 
-It's also a **single point of failure and a latency bottleneck** by construction — every request pays its overhead. It must be deployed as a horizontally-scaled, stateless fleet behind its own load balancer (see [[CS Fundamentals/Networking/Load Balancing|Load Balancing]]), never as a single instance.
+It's also a **single point of failure and a latency bottleneck** by construction — every request pays its overhead. It must be deployed as a horizontally-scaled, stateless fleet behind its own load balancer (see [[CS Fundamentals/02 - Networking/Load Balancing|Load Balancing]]), never as a single instance.
 
 ---
 
@@ -60,4 +60,4 @@ It's also a **single point of failure and a latency bottleneck** by construction
 > A single generic gateway shape-fits-all clients, which can mean mobile clients receive bloated payloads designed for web, or vice versa. BFF splits the gateway per client type, each shaped to that client's actual needs — a real tradeoff of more gateways to maintain against better-fitted responses per client.
 
 ---
-*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[CS Fundamentals/Networking/Load Balancing|Load Balancing]] · [[CS Fundamentals/Security/Authentication & Authorization|Authentication & Authorization]] · [[HLD/02 - Design a Rate Limiter/Design a Rate Limiter|Design a Rate Limiter]]*
+*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[CS Fundamentals/02 - Networking/Load Balancing|Load Balancing]] · [[CS Fundamentals/08 - Security/Authentication & Authorization|Authentication & Authorization]] · [[HLD/02 - Design a Rate Limiter/Design a Rate Limiter|Design a Rate Limiter]]*

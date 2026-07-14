@@ -11,7 +11,7 @@ status: reference-quality
 > Choose correctly between range, hash, and directory-based sharding for a given access pattern, explain precisely why each creates hotspots under different conditions, and describe how resharding actually happens without downtime.
 
 > [!info] This is the general version of a problem you've already solved per-database
-> [[CS Fundamentals/Databases/Cassandra Internals|Cassandra]] and [[CS Fundamentals/Databases/MongoDB Internals|MongoDB]] each made a specific sharding choice with specific failure modes (Mongo's hot-shard-key problem, Cassandra's hash-ring). This chapter is the general theory underneath both, taught once.
+> [[CS Fundamentals/03 - Databases/Cassandra Internals|Cassandra]] and [[CS Fundamentals/03 - Databases/MongoDB Internals|MongoDB]] each made a specific sharding choice with specific failure modes (Mongo's hot-shard-key problem, Cassandra's hash-ring). This chapter is the general theory underneath both, taught once.
 
 ---
 
@@ -30,13 +30,13 @@ Data is partitioned by **contiguous ranges** of the shard key (e.g., user IDs 1-
 
 ### Hash-based sharding
 
-The shard key is hashed, and the hash determines the shard (`shard = hash(key) % N`, or better, via [[CS Fundamentals/Distributed Systems/Consistent Hashing|consistent hashing]]).
+The shard key is hashed, and the hash determines the shard (`shard = hash(key) % N`, or better, via [[CS Fundamentals/06 - Distributed Systems/Consistent Hashing|consistent hashing]]).
 
 - **Pro:** hashing spreads keys near-uniformly — the monotonic-write hotspot above disappears entirely.
 - **Con:** range queries now require a **scatter-gather** across every shard, since consecutive keys are scattered randomly — no shard holds a useful contiguous range anymore.
 
 > [!tip] Plain `hash(key) % N` vs. consistent hashing — don't conflate them
-> `% N` reshuffles *almost every key* when `N` changes (adding/removing a shard) — a resharding disaster. [[CS Fundamentals/Distributed Systems/Consistent Hashing|Consistent hashing]] (already covered in depth) is the fix: adding/removing a node only remaps the keys on the ring segment adjacent to that node, not the whole keyspace. Any real hash-sharded system uses consistent hashing, not naive modulo, for exactly this reason.
+> `% N` reshuffles *almost every key* when `N` changes (adding/removing a shard) — a resharding disaster. [[CS Fundamentals/06 - Distributed Systems/Consistent Hashing|Consistent hashing]] (already covered in depth) is the fix: adding/removing a node only remaps the keys on the ring segment adjacent to that node, not the whole keyspace. Any real hash-sharded system uses consistent hashing, not naive modulo, for exactly this reason.
 
 ### Directory-based (lookup) sharding
 
@@ -48,7 +48,7 @@ A separate **lookup service** maps each key to its shard explicitly, rather than
 ## The hot-shard problem, generalized
 
 > [!bug] Hashing solves *key* skew, not *access-pattern* skew
-> Hash sharding fixes the monotonic-write hotspot, but a single **celebrity key** — one user, one product, one chat room getting disproportionate traffic — still lands entirely on one shard no matter how uniformly the hash function distributes other keys. This is exactly [[CS Fundamentals/Databases/MongoDB Internals|MongoDB's hot-shard-key problem]] from the dedicated chapter — worth recognizing as the *same* underlying issue, not a MongoDB-specific quirk. The general fix is the same one used there: add entropy to the key itself (e.g., append a random suffix and fan out reads across the resulting sub-keys) when a single logical key's traffic genuinely exceeds one shard's capacity.
+> Hash sharding fixes the monotonic-write hotspot, but a single **celebrity key** — one user, one product, one chat room getting disproportionate traffic — still lands entirely on one shard no matter how uniformly the hash function distributes other keys. This is exactly [[CS Fundamentals/03 - Databases/MongoDB Internals|MongoDB's hot-shard-key problem]] from the dedicated chapter — worth recognizing as the *same* underlying issue, not a MongoDB-specific quirk. The general fix is the same one used there: add entropy to the key itself (e.g., append a random suffix and fan out reads across the resulting sub-keys) when a single logical key's traffic genuinely exceeds one shard's capacity.
 
 ## Resharding without downtime
 
@@ -76,7 +76,7 @@ A query or transaction that spans multiple shards (a JOIN across shards, a trans
 > Because the hash destroys locality — consecutive keys land on unrelated shards. If range queries are also required, some systems use a **composite** key (a coarse prefix that's range-partitioned, hashed *within* each range) — a real hybrid, at the cost of added complexity. Naming this hybrid explicitly, rather than presenting hash vs. range as mutually exclusive, is a stronger interview answer.
 
 > [!question]- What actually breaks if you reshard using plain `hash(key) % N` instead of consistent hashing?
-> Changing `N` remaps nearly every key to a different shard simultaneously — the exact problem [[CS Fundamentals/Distributed Systems/Consistent Hashing|Consistent Hashing]] was built to solve. A production resharding event using modulo hashing would need to move almost all data at once instead of the small fraction consistent hashing requires.
+> Changing `N` remaps nearly every key to a different shard simultaneously — the exact problem [[CS Fundamentals/06 - Distributed Systems/Consistent Hashing|Consistent Hashing]] was built to solve. A production resharding event using modulo hashing would need to move almost all data at once instead of the small fraction consistent hashing requires.
 
 ---
-*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[CS Fundamentals/Distributed Systems/Consistent Hashing|Consistent Hashing]] · [[CS Fundamentals/Databases/MongoDB Internals|MongoDB Internals]] · [[CS Fundamentals/Databases/Cassandra Internals|Cassandra Internals]] · [[Glossary/Saga Pattern|Saga Pattern]]*
+*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[CS Fundamentals/06 - Distributed Systems/Consistent Hashing|Consistent Hashing]] · [[CS Fundamentals/03 - Databases/MongoDB Internals|MongoDB Internals]] · [[CS Fundamentals/03 - Databases/Cassandra Internals|Cassandra Internals]] · [[Glossary/Saga Pattern|Saga Pattern]]*

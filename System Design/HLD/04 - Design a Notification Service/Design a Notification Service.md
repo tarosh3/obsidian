@@ -31,7 +31,7 @@ Assume 50M users, ~5 notifications/user/day → **250M notifications/day**, ~2,9
 
 **v0 — the naive version.** The triggering application code calls the SMS/push/email provider's API **synchronously**, inline, as part of handling the original request (e.g. the "order placed" handler directly calls a Twilio-like API). This breaks in three concrete ways: a slow or down provider blocks the *primary* request flow (a user placing an order shouldn't wait on an SMS call to complete); burst traffic hits the downstream provider directly, likely exceeding *its* rate limits and getting the whole account throttled; there's no retry story at all if the call fails.
 
-**Fix: decouple via async messaging.** The triggering service publishes a notification-request event to [[CS Fundamentals/Messaging & Streaming/Kafka Internals|Kafka]] and returns immediately — a separate notification-processing pipeline handles actual delivery, completely off the critical path of the original request.
+**Fix: decouple via async messaging.** The triggering service publishes a notification-request event to [[CS Fundamentals/05 - Messaging & Streaming/Kafka Internals|Kafka]] and returns immediately — a separate notification-processing pipeline handles actual delivery, completely off the critical path of the original request.
 
 **Need per-channel routing.** A dispatch layer decides which channel(s) apply (based on notification type and user preferences), then publishes to **per-channel topics** (`push-notifications`, `sms-notifications`, `email-notifications`) — letting each channel's consumers scale and rate-limit independently, matched to *that specific provider's* constraints.
 
@@ -54,13 +54,13 @@ One triggering event ("flash sale started") can expand into **millions** of indi
 ### Priority isolation — avoiding head-of-line blocking
 
 > [!bug] The mistake this section exists to prevent
-> If OTP/security-code notifications share the **same queue** as bulk marketing notifications, a burst of low-priority marketing traffic can sit *ahead* of a time-critical OTP in that queue, delaying it — the exact same **head-of-line blocking** concept from [[CS Fundamentals/Networking/TCP Deep Dive|TCP]] (one blocked/slow item stalling everything queued behind it), just showing up at the application-messaging layer instead of the transport layer.
+> If OTP/security-code notifications share the **same queue** as bulk marketing notifications, a burst of low-priority marketing traffic can sit *ahead* of a time-critical OTP in that queue, delaying it — the exact same **head-of-line blocking** concept from [[CS Fundamentals/02 - Networking/TCP Deep Dive|TCP]] (one blocked/slow item stalling everything queued behind it), just showing up at the application-messaging layer instead of the transport layer.
 
 The fix: **separate topics/queues per priority tier**, each with its own dedicated consumers — a flood of marketing notifications never shares a queue with OTP traffic, so it physically cannot delay it.
 
 ### Retry & dead-letter handling
 
-Provider failures get exponential-backoff retries, then route to a dead-letter queue after a bounded number of attempts — the same pattern [[CS Fundamentals/Messaging & Streaming/RabbitMQ Internals|RabbitMQ's dead-letter exchanges]] formalize, generalizable here even on a Kafka-based pipeline as a dedicated "failed notifications" topic for follow-up/alerting.
+Provider failures get exponential-backoff retries, then route to a dead-letter queue after a bounded number of attempts — the same pattern [[CS Fundamentals/05 - Messaging & Streaming/RabbitMQ Internals|RabbitMQ's dead-letter exchanges]] formalize, generalizable here even on a Kafka-based pipeline as a dedicated "failed notifications" topic for follow-up/alerting.
 
 ---
 
@@ -118,10 +118,10 @@ sequenceDiagram
 ## Step 8 — Production experience
 
 > [!info] What to monitor
-> Delivery success rate **per channel and per provider** (a silent degradation on one provider shouldn't be masked by healthy aggregate numbers across all channels). Provider latency and error rate. **Queue depth / consumer lag per channel** (see [[CS Fundamentals/Messaging & Streaming/Kafka Internals|Kafka's consumer lag]] as the direct monitoring primitive). Dead-letter queue size — a *growing* DLQ signals a systemic problem, not isolated one-off failures.
+> Delivery success rate **per channel and per provider** (a silent degradation on one provider shouldn't be masked by healthy aggregate numbers across all channels). Provider latency and error rate. **Queue depth / consumer lag per channel** (see [[CS Fundamentals/05 - Messaging & Streaming/Kafka Internals|Kafka's consumer lag]] as the direct monitoring primitive). Dead-letter queue size — a *growing* DLQ signals a systemic problem, not isolated one-off failures.
 
 > [!bug] A real production gotcha
 > A provider **degrading** (meaningfully higher latency, not an outright failure) doesn't trip error-rate alerts the same way an outage does — it shows up first as *gradually building consumer lag*. Alerting on lag **trend**, not just an absolute threshold, catches this well before it becomes a full backlog.
 
 ---
-*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[CS Fundamentals/Messaging & Streaming/Kafka Internals|Kafka Internals]] · [[HLD/02 - Design a Rate Limiter/Design a Rate Limiter|Design a Rate Limiter]] · [[Glossary/Idempotency|Idempotency]] · [[Glossary/Circuit Breaker|Circuit Breaker]] · [[Glossary/Fan-out vs Fan-in|Fan-out vs Fan-in]]*
+*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[CS Fundamentals/05 - Messaging & Streaming/Kafka Internals|Kafka Internals]] · [[HLD/02 - Design a Rate Limiter/Design a Rate Limiter|Design a Rate Limiter]] · [[Glossary/Idempotency|Idempotency]] · [[Glossary/Circuit Breaker|Circuit Breaker]] · [[Glossary/Fan-out vs Fan-in|Fan-out vs Fan-in]]*

@@ -34,7 +34,7 @@ Assume 1M active users, with a realistic peak of ~100,000–500,000 rate-limit c
 
 **v0 — the naive version.** A counter in each app server's local memory. This **breaks the instant there's more than one server**: a client's requests get load-balanced across instances, and each instance has its own independent, wrong view of "how many requests has this client made recently." This isn't a scaling nuance — it's the entire problem this chapter exists to solve.
 
-**Fix: shared, fast, centralized counter state.** [[CS Fundamentals/Caching/Redis Internals|Redis]] is the natural fit — in-memory (sub-millisecond ops), supports atomic increments natively, and is purpose-built for exactly this kind of hot-path shared counter.
+**Fix: shared, fast, centralized counter state.** [[CS Fundamentals/04 - Caching/Redis Internals|Redis]] is the natural fit — in-memory (sub-millisecond ops), supports atomic increments natively, and is purpose-built for exactly this kind of hot-path shared counter.
 
 ### The algorithm choice — four real options, four real tradeoffs
 
@@ -52,7 +52,7 @@ Assume 1M active users, with a realistic peak of ~100,000–500,000 rate-limit c
 > [!bug] "Read tokens, check, decrement" as three separate Redis calls is a real race condition
 > If a rate limiter reads the current token count, checks it against the limit, and decrements it as **three separate round-trips** to Redis, two concurrent requests from *different app servers* hitting the *same client's* key can both read the same "tokens remaining" value before either one's decrement lands — both get approved, and the limit is silently violated under real concurrent load.
 
-The fix: perform the entire check-and-decrement as **one atomic Redis Lua script**. This works precisely because of [[CS Fundamentals/Caching/Redis Internals|Redis's single-threaded command execution]] — a Lua script runs to completion as one indivisible unit, with no other client's command able to interleave partway through it. This is the exact payoff of that architectural fact from the Redis Internals chapter, applied directly: it's *why* this atomicity guarantee is even possible without a separate distributed lock.
+The fix: perform the entire check-and-decrement as **one atomic Redis Lua script**. This works precisely because of [[CS Fundamentals/04 - Caching/Redis Internals|Redis's single-threaded command execution]] — a Lua script runs to completion as one indivisible unit, with no other client's command able to interleave partway through it. This is the exact payoff of that architectural fact from the Redis Internals chapter, applied directly: it's *why* this atomicity guarantee is even possible without a separate distributed lock.
 
 ```lua
 -- Simplified token bucket check-and-consume, run atomically in Redis
@@ -127,7 +127,7 @@ sequenceDiagram
 > Key the Redis state by `{client_id}:{endpoint}` rather than just `{client_id}` — each endpoint gets its own independent bucket/window, with per-endpoint rate/capacity configuration looked up (and cached) by the app server before invoking the Lua script.
 
 > [!quote]- "How would you scale the rate limiter itself to 10x traffic?"
-> Shard the Redis layer — either by hashing client ID across multiple Redis instances directly, or via [[CS Fundamentals/Caching/Redis Internals|Redis Cluster's hash-slot sharding]], so no single Redis node is the bottleneck for the entire fleet's rate-limit checks.
+> Shard the Redis layer — either by hashing client ID across multiple Redis instances directly, or via [[CS Fundamentals/04 - Caching/Redis Internals|Redis Cluster's hash-slot sharding]], so no single Redis node is the bottleneck for the entire fleet's rate-limit checks.
 
 ---
 
@@ -140,4 +140,4 @@ sequenceDiagram
 > If window-boundary calculations are computed using **each app server's own local clock** rather than a centralized source, clock skew between servers can cause inconsistent fixed-window boundaries for the same client depending on which server handled the request. Keeping all time-sensitive logic inside the Lua script (using Redis's own `TIME` command, or passing a consistently-sourced timestamp) avoids this entirely.
 
 ---
-*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[CS Fundamentals/Caching/Redis Internals|Redis Internals]] · [[LLD/04 - Design a Rate Limiter/Design a Rate Limiter|LLD version — Design a Rate Limiter]]*
+*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[CS Fundamentals/04 - Caching/Redis Internals|Redis Internals]] · [[LLD/04 - Design a Rate Limiter/Design a Rate Limiter|LLD version — Design a Rate Limiter]]*

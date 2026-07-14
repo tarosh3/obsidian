@@ -35,7 +35,7 @@ status: reference-quality
 
 **v0 — naive.** Each service writes logs directly to a shared database. Breaks immediately: no traditional DB write path survives 1M lines/sec, and worse — if the shared database goes down, **every service's logging breaks too**, coupling monitoring availability to a single shared dependency. Exactly the failure-domain-sharing the requirements warned against.
 
-**Fix — decouple ingestion from processing via a queue.** Each service publishes to [[CS Fundamentals/Messaging & Streaming/Kafka Internals|Kafka]] asynchronously — the identical decoupling reasoning from [[HLD/04 - Design a Notification Service/Design a Notification Service|the Notification Service chapter]], applied to logs instead of notifications. Kafka absorbs ingestion bursts and decouples producers (services) from consumers (the indexing pipeline).
+**Fix — decouple ingestion from processing via a queue.** Each service publishes to [[CS Fundamentals/05 - Messaging & Streaming/Kafka Internals|Kafka]] asynchronously — the identical decoupling reasoning from [[HLD/04 - Design a Notification Service/Design a Notification Service|the Notification Service chapter]], applied to logs instead of notifications. Kafka absorbs ingestion bursts and decouples producers (services) from consumers (the indexing pipeline).
 
 > [!warning] The local logging agent must be fail-safe by design
 > Each service host runs a lightweight local agent that buffers logs and tolerates brief Kafka unavailability without blocking the service's own primary work. A logging problem must **never** take down the service being monitored — worth stating as a hard design constraint, not an implementation detail.
@@ -102,4 +102,4 @@ graph TD
 > Kafka consumer lag for the ingestion pipeline (standard Kafka-lag practice, applied to the monitoring system's own pipeline). Alert evaluation latency — time from a threshold breach to an alert firing, the actual product-critical metric for this whole system. The independent dead-man's-switch signal itself — this **is** the top-level "is our observability stack alive" metric. Storage cost by tier — an ongoing, direct infrastructure lever.
 
 ---
-*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[CS Fundamentals/Messaging & Streaming/Kafka Internals|Kafka Internals]] · [[HLD/04 - Design a Notification Service/Design a Notification Service|Design a Notification Service]]*
+*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[CS Fundamentals/05 - Messaging & Streaming/Kafka Internals|Kafka Internals]] · [[HLD/04 - Design a Notification Service/Design a Notification Service|Design a Notification Service]]*

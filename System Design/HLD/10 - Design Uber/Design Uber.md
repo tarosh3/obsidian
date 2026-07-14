@@ -50,7 +50,7 @@ Geospatial index lookup returns **candidates** by straight-line ("as the crow fl
 
 ### Location-update ingestion at 1.25M/sec
 
-This is fundamentally a high-throughput **write** problem, structurally similar to the messaging infrastructure already covered elsewhere in this handbook: updates publish to [[CS Fundamentals/Messaging & Streaming/Kafka Internals|Kafka]] (partitioned by geographic region for locality), consumed by a service updating the geospatial index — backed by [[CS Fundamentals/Caching/Redis Internals|Redis]] for its speed, matching exactly the kind of frequently-updated, latency-sensitive data Redis is built for.
+This is fundamentally a high-throughput **write** problem, structurally similar to the messaging infrastructure already covered elsewhere in this handbook: updates publish to [[CS Fundamentals/05 - Messaging & Streaming/Kafka Internals|Kafka]] (partitioned by geographic region for locality), consumed by a service updating the geospatial index — backed by [[CS Fundamentals/04 - Caching/Redis Internals|Redis]] for its speed, matching exactly the kind of frequently-updated, latency-sensitive data Redis is built for.
 
 > [!tip] Not every piece of data in this system needs the same durability guarantee
 > GPS location pings are **ephemeral** — losing one update is fine, since the next one arrives in 4 seconds and supersedes it. Writing every ping synchronously to a durable database would be wasted cost for no real benefit. A ride's **financial transaction data**, in the same system, absolutely does need full durability. Recognizing that different data *within one system* can legitimately have different consistency/durability bars — rather than applying one uniform standard everywhere — is a genuine senior-level distinction.
@@ -92,4 +92,4 @@ graph TD
 > Geospatial index update lag — are location updates reflected in match-eligible data in near-real-time, or is there a growing processing delay? **Match latency** (rider-request to driver-assigned time) — the core UX metric. Matching success rate **by region** (surfaces localized supply/demand imbalance). Kafka consumer lag on the location-ingestion pipeline.
 
 ---
-*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[LLD/06 - Design BookMyShow - Seat Booking/Design BookMyShow - Seat Booking|Design BookMyShow / Seat Booking]] · [[CS Fundamentals/Caching/Redis Internals|Redis Internals]]*
+*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[LLD/06 - Design BookMyShow - Seat Booking/Design BookMyShow - Seat Booking|Design BookMyShow / Seat Booking]] · [[CS Fundamentals/04 - Caching/Redis Internals|Redis Internals]]*

@@ -12,6 +12,6 @@ tags: [system-design, glossary]
 Each server (often as multiple **virtual nodes** for better load balance) sits at a position on the ring; a key is assigned to the next server clockwise from its hash position. Add a server → it only takes over keys between it and its counterclockwise neighbor. This is *the* algorithm behind sharding, distributed caching, and consistent load balancing at scale.
 
 > [!tip] This is a glossary stub
-> Full explanation with ring diagrams, virtual-node mechanics, and the Redis Cluster contrast: [[CS Fundamentals/Distributed Systems/Consistent Hashing|Consistent Hashing]].
+> Full explanation with ring diagrams, virtual-node mechanics, and the Redis Cluster contrast: [[CS Fundamentals/06 - Distributed Systems/Consistent Hashing|Consistent Hashing]].
 
-**Used in:** [[CS Fundamentals/Distributed Systems/Consistent Hashing|Consistent Hashing]], [[HLD/03 - Design a Distributed Cache (build Redis)/Design a Distributed Cache|Design a Distributed Cache]], [[CS Fundamentals/Databases/Cassandra Internals|Cassandra Internals]]
+**Used in:** [[CS Fundamentals/06 - Distributed Systems/Consistent Hashing|Consistent Hashing]], [[HLD/03 - Design a Distributed Cache (build Redis)/Design a Distributed Cache|Design a Distributed Cache]], [[CS Fundamentals/03 - Databases/Cassandra Internals|Cassandra Internals]]

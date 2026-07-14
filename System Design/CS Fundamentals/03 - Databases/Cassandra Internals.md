@@ -8,7 +8,7 @@ status: reference-quality
 # Cassandra Internals
 
 > [!abstract] What you'll be able to do after this chapter
-> Explain Cassandra's write path precisely (why it's so write-optimized), deliver the LSM-Tree depth [[CS Fundamentals/Databases/Indexes & B+ Trees|the B+ Tree chapter]] promised as the "when B+ Trees are wrong" answer, and name the tombstone problem as the concrete reason "Cassandra as a queue" is a well-known anti-pattern.
+> Explain Cassandra's write path precisely (why it's so write-optimized), deliver the LSM-Tree depth [[CS Fundamentals/03 - Databases/Indexes & B+ Trees|the B+ Tree chapter]] promised as the "when B+ Trees are wrong" answer, and name the tombstone problem as the concrete reason "Cassandra as a queue" is a well-known anti-pattern.
 
 ---
 
@@ -22,7 +22,7 @@ A Cassandra "row" is identified by a **partition key**; within a partition, data
 
 ## 3. The write path — LSM-Trees, and the depth the B+ Tree chapter promised
 
-> [!tip] This delivers on [[CS Fundamentals/Databases/Indexes & B+ Trees|Indexes & B+ Trees]]'s "when B+ Trees are the wrong choice" pointer
+> [!tip] This delivers on [[CS Fundamentals/03 - Databases/Indexes & B+ Trees|Indexes & B+ Trees]]'s "when B+ Trees are the wrong choice" pointer
 > Cassandra is built on an **LSM-Tree** (Log-Structured Merge-Tree), the write-optimized counterpart to the B+ Tree's read/range-optimized design.
 
 The mechanics: a write goes to an in-memory **memtable**, plus a **commit log** on disk (a pure sequential append, for durability — if the process crashes, the commit log replays to rebuild the memtable). **No read-before-write, no random disk I/O on the write path at all** — this is the entire reason Cassandra is so write-optimized. Periodically, a full memtable is flushed to disk as an immutable **SSTable** (Sorted String Table). A background **compaction** process merges multiple SSTables over time, discarding data that's been overwritten or deleted (see tombstones, below).
@@ -39,7 +39,7 @@ graph LR
 
 **The read-side cost of this tradeoff:** a read might need to check the memtable *and* multiple SSTables to find the latest value for a key. Mitigated by a **[[Glossary/Bloom Filter|Bloom filter]] per SSTable** — a cheap, no-false-negative check to quickly rule out SSTables that definitely don't contain the key, avoiding unnecessary disk reads.
 
-## 4. Tunable consistency — delivering on [[CS Fundamentals/Distributed Systems/CAP Theorem & PACELC|the CAP/PACELC chapter's]] promise
+## 4. Tunable consistency — delivering on [[CS Fundamentals/06 - Distributed Systems/CAP Theorem & PACELC|the CAP/PACELC chapter's]] promise
 
 Cassandra's signature feature: **per-query consistency level** (`ONE`, `QUORUM`, `ALL`, `LOCAL_QUORUM` for multi-datacenter setups). This is [[Glossary/Quorum (R + W over N)|the quorum mechanism]], made directly configurable — a single application can read with `ONE` (fast, weaker) for a low-stakes lookup and `QUORUM` (stronger, slower) for a critical read, on the same cluster, chosen per query rather than fixed system-wide.
 
@@ -73,4 +73,4 @@ Needing traditional **multi-row ACID transactions or joins** — Cassandra has n
 > Deletes create tombstones that must persist for a grace period before being compacted away — a workload with frequent deletes (exactly what a queue does constantly) accumulates tombstones faster than compaction can clean them up, and reads have to scan past them, causing real, measurable latency degradation over time.
 
 ---
-*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[CS Fundamentals/Databases/Indexes & B+ Trees|Indexes & B+ Trees]] · [[CS Fundamentals/Distributed Systems/CAP Theorem & PACELC|CAP Theorem & PACELC]] · [[Glossary/Bloom Filter|Bloom Filter]] · [[Glossary/Gossip Protocol|Gossip Protocol]] · [[Glossary/Quorum (R + W over N)|Quorum]]*
+*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[CS Fundamentals/03 - Databases/Indexes & B+ Trees|Indexes & B+ Trees]] · [[CS Fundamentals/06 - Distributed Systems/CAP Theorem & PACELC|CAP Theorem & PACELC]] · [[Glossary/Bloom Filter|Bloom Filter]] · [[Glossary/Gossip Protocol|Gossip Protocol]] · [[Glossary/Quorum (R + W over N)|Quorum]]*

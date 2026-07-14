@@ -87,7 +87,7 @@ A **cache hit** means the CPU found the data it needed already sitting in a fast
 
 ### Virtual memory and pointers (the bridge to the OS chapter)
 
-A running program doesn't see physical RAM addresses directly — it sees **virtual addresses**, translated to physical addresses by the CPU's memory management unit (MMU) using page tables the OS maintains. A **pointer** in your code is a virtual address. This translation is itself cached (in a structure called the TLB — Translation Lookaside Buffer) for the same reason everything else is cached: doing the full translation on every single memory access would be far too slow. Full depth on paging, page faults, and virtual memory lives in [[CS Fundamentals/Operating Systems/Processes, Threads & Context Switching|the Operating Systems chapter]] — this chapter only establishes that the translation step exists and costs something.
+A running program doesn't see physical RAM addresses directly — it sees **virtual addresses**, translated to physical addresses by the CPU's memory management unit (MMU) using page tables the OS maintains. A **pointer** in your code is a virtual address. This translation is itself cached (in a structure called the TLB — Translation Lookaside Buffer) for the same reason everything else is cached: doing the full translation on every single memory access would be far too slow. Full depth on paging, page faults, and virtual memory lives in [[CS Fundamentals/01 - Operating Systems/Processes, Threads & Context Switching|the Operating Systems chapter]] — this chapter only establishes that the translation step exists and costs something.
 
 ---
 
@@ -122,8 +122,8 @@ There is no version of this hierarchy that isn't a tradeoff — a system with "i
 ## 8. Where this shows up later in this book
 
 > [!success] This isn't abstract — you'll see this exact reasoning reused constantly
-> - **Why Redis is fast:** keeps everything in RAM, entirely skipping the disk tier for reads — [[CS Fundamentals/Caching/Redis Internals|Redis Internals]].
-> - **Why B+ Tree page sizes are chosen to match disk block sizes:** minimizes the number of slow disk seeks needed to traverse the tree — [[CS Fundamentals/Databases/Indexes & B+ Trees|Indexes & B+ Trees]].
+> - **Why Redis is fast:** keeps everything in RAM, entirely skipping the disk tier for reads — [[CS Fundamentals/04 - Caching/Redis Internals|Redis Internals]].
+> - **Why B+ Tree page sizes are chosen to match disk block sizes:** minimizes the number of slow disk seeks needed to traverse the tree — [[CS Fundamentals/03 - Databases/Indexes & B+ Trees|Indexes & B+ Trees]].
 > - **Why the "latency numbers every engineer should know" question exists:** it's testing whether you have this chapter's mental model, not whether you memorized a table — [[00 - Start Here/100 System Design Interview Questions|100 System Design Interview Questions]].
 > - **Why minimizing network hops is a recurring theme across every HLD chapter:** a network call is the single slowest, most variable operation in the entire hierarchy — everything from caching strategy to service-mesh design is partly about avoiding unnecessary trips down to that tier.
 
@@ -152,4 +152,4 @@ There is no version of this hierarchy that isn't a tradeoff — a system with "i
 - A cross-region network round trip costs roughly the same time as **hundreds of millions of CPU cycles** — this single fact justifies most of the caching/sharding/CDN reasoning in the rest of this handbook.
 
 ---
-*Related: [[CS Fundamentals/00 - Learning Path|CS Fundamentals Learning Path]] · [[CS Fundamentals/Operating Systems/Processes, Threads & Context Switching|Operating Systems]] · [[CS Fundamentals/Caching/Redis Internals|Redis Internals]] · [[CS Fundamentals/Databases/Indexes & B+ Trees|Indexes & B+ Trees]]*
+*Related: [[CS Fundamentals/00 - Learning Path|CS Fundamentals Learning Path]] · [[CS Fundamentals/01 - Operating Systems/Processes, Threads & Context Switching|Operating Systems]] · [[CS Fundamentals/04 - Caching/Redis Internals|Redis Internals]] · [[CS Fundamentals/03 - Databases/Indexes & B+ Trees|Indexes & B+ Trees]]*

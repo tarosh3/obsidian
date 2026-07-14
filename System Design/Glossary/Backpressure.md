@@ -15,4 +15,4 @@ In Go, a **bounded/buffered channel** is the simplest backpressure primitive —
 > A factory conveyor belt that stops feeding new parts in when the packing station at the end is backed up — instead of parts piling up on the floor uncontrolled.
 
 > [!tip] Related full chapters
-> [[CS Fundamentals/Distributed Systems/Resilience Patterns|Resilience Patterns]] (bulkheads, timeout budgets — the neighboring resilience techniques) · [[CS Fundamentals/Messaging & Streaming/Kafka Internals|Kafka Internals]] (a consumer falling behind is exactly a backpressure signal, visible as consumer lag)
+> [[CS Fundamentals/06 - Distributed Systems/Resilience Patterns|Resilience Patterns]] (bulkheads, timeout budgets — the neighboring resilience techniques) · [[CS Fundamentals/05 - Messaging & Streaming/Kafka Internals|Kafka Internals]] (a consumer falling behind is exactly a backpressure signal, visible as consumer lag)

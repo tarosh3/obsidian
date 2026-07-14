@@ -88,4 +88,4 @@ graph TD
 > HLL estimate drift — periodically spot-check the approximate count against an **exact** count on a small sampled subset of campaigns, to catch implementation bugs (a bad hash function, register-count misconfiguration) that would otherwise silently skew every estimate. Ingestion lag (Kafka consumer lag, same practice as [[HLD/20 - Design a Log Aggregation and Monitoring System/Design a Log Aggregation and Monitoring System|the Log Aggregation chapter]]). Sketch-merge query latency as the number of time buckets requested grows.
 
 ---
-*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[CS Fundamentals/Messaging & Streaming/Kafka Internals|Kafka Internals]] · [[Glossary/Bloom Filter|Bloom Filter]] (a related but distinct probabilistic structure — membership testing, not counting)*
+*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[CS Fundamentals/05 - Messaging & Streaming/Kafka Internals|Kafka Internals]] · [[Glossary/Bloom Filter|Bloom Filter]] (a related but distinct probabilistic structure — membership testing, not counting)*

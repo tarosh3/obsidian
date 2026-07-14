@@ -8,7 +8,7 @@ status: reference-quality
 # Memcached Internals
 
 > [!abstract] What you'll be able to do after this chapter
-> Explain the slab allocator precisely (the actual interview-favorite Memcached detail), contrast its multi-threaded model against [[CS Fundamentals/Caching/Redis Internals|Redis's single-threaded one]] with real justification for both, and give a genuine Memcached-vs-Redis decision framework.
+> Explain the slab allocator precisely (the actual interview-favorite Memcached detail), contrast its multi-threaded model against [[CS Fundamentals/04 - Caching/Redis Internals|Redis's single-threaded one]] with real justification for both, and give a genuine Memcached-vs-Redis decision framework.
 
 ---
 
@@ -19,7 +19,7 @@ Memcached (2003, originally built for LiveJournal) does **one thing**: cache arb
 ## 2. Multi-threaded — and why that's the *right* call here, unlike Redis
 
 > [!tip] Contrast this directly with Redis
-> [[CS Fundamentals/Caching/Redis Internals|Redis]] is deliberately single-threaded for command execution, because its rich data structures (sorted sets, etc.) make safe concurrent access to shared structures genuinely hard to reason about without heavy locking. Memcached's operations are much simpler — get/set/delete on **opaque blobs**, no internal structure to protect beyond a hash table entry. That simplicity is *why* Memcached can safely use multiple threads (each handling a subset of connections, built on `libevent` for I/O) to scale across CPU cores, where the same move would cost Redis more than it gains.
+> [[CS Fundamentals/04 - Caching/Redis Internals|Redis]] is deliberately single-threaded for command execution, because its rich data structures (sorted sets, etc.) make safe concurrent access to shared structures genuinely hard to reason about without heavy locking. Memcached's operations are much simpler — get/set/delete on **opaque blobs**, no internal structure to protect beyond a hash table entry. That simplicity is *why* Memcached can safely use multiple threads (each handling a subset of connections, built on `libevent` for I/O) to scale across CPU cores, where the same move would cost Redis more than it gains.
 
 ## 3. The slab allocator — the actual interview-favorite detail
 
@@ -46,7 +46,7 @@ Eviction is **LRU per size class**, not one global LRU across the whole cache �
 
 ## 5. No persistence, no server-side clustering — sharding lives on the client
 
-A Memcached instance knows **nothing** about any other Memcached instance — unlike [[CS Fundamentals/Caching/Redis Internals|Redis Cluster's]] server-side hash-slot awareness, scaling Memcached across multiple instances is typically done via **client-side hashing** ([[Glossary/Consistent Hashing|consistent hashing]], almost always) — the client library decides which of several independent, mutually-unaware Memcached instances owns a given key. A genuinely different architecture philosophy from Redis Cluster, worth stating explicitly if compared.
+A Memcached instance knows **nothing** about any other Memcached instance — unlike [[CS Fundamentals/04 - Caching/Redis Internals|Redis Cluster's]] server-side hash-slot awareness, scaling Memcached across multiple instances is typically done via **client-side hashing** ([[Glossary/Consistent Hashing|consistent hashing]], almost always) — the client library decides which of several independent, mutually-unaware Memcached instances owns a given key. A genuinely different architecture philosophy from Redis Cluster, worth stating explicitly if compared.
 
 ## 6. Memcached vs Redis — a real decision framework
 
@@ -78,4 +78,4 @@ Needing **persistence** — a restart loses everything, with no RDB/AOF equivale
 > Pure, high-throughput blob caching across many CPU cores with no need for persistence, rich types, or server-side cluster awareness — situations where Redis's extra capabilities would just be unused overhead.
 
 ---
-*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[CS Fundamentals/Caching/Redis Internals|Redis Internals]] · [[CS Fundamentals/Caching/Caching Strategies|Caching Strategies]] · [[Glossary/Consistent Hashing|Consistent Hashing]]*
+*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[CS Fundamentals/04 - Caching/Redis Internals|Redis Internals]] · [[CS Fundamentals/04 - Caching/Caching Strategies|Caching Strategies]] · [[Glossary/Consistent Hashing|Consistent Hashing]]*

@@ -26,7 +26,7 @@ Serving every request from one origin server means every user, everywhere, pays 
 
 ## Anycast routing — the "which edge" mechanism
 
-The same IP address is announced from multiple physical locations; the network layer's routing naturally sends each client's traffic to the **topologically nearest** location advertising that address — no application-level logic decides this, it falls out of how internet routing already works. This is the same idea [[CS Fundamentals/Networking/Load Balancing|the Load Balancing chapter]] mentioned for LB redundancy, applied here to route users to the nearest edge location rather than to a fleet.
+The same IP address is announced from multiple physical locations; the network layer's routing naturally sends each client's traffic to the **topologically nearest** location advertising that address — no application-level logic decides this, it falls out of how internet routing already works. This is the same idea [[CS Fundamentals/02 - Networking/Load Balancing|the Load Balancing chapter]] mentioned for LB redundancy, applied here to route users to the nearest edge location rather than to a fleet.
 
 ## The hard problem: cache invalidation
 
@@ -55,4 +55,4 @@ Modern CDNs (Cloudflare Workers, Lambda@Edge) run **actual application code** at
 > [[HLD/22 - Design Google Meet/Design Google Meet|Google Meet's HLD chapter]] uses CDN infrastructure specifically for **large webinars** — broadcasting one stream to a huge passive audience is structurally similar to video-on-demand distribution (one piece of content, many viewers, cacheable), unlike the interactive many-to-many SFU path used for regular meeting participants, which is genuinely real-time and not cacheable at all.
 
 ---
-*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[HLD/09 - Design YouTube - Netflix/Design YouTube - Netflix|Design YouTube / Netflix]] · [[CS Fundamentals/Networking/Load Balancing|Load Balancing]] · [[CS Fundamentals/Networking/HTTP Evolution & DNS Resolution|HTTP Evolution & DNS Resolution]]*
+*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[HLD/09 - Design YouTube - Netflix/Design YouTube - Netflix|Design YouTube / Netflix]] · [[CS Fundamentals/02 - Networking/Load Balancing|Load Balancing]] · [[CS Fundamentals/02 - Networking/HTTP Evolution & DNS Resolution|HTTP Evolution & DNS Resolution]]*

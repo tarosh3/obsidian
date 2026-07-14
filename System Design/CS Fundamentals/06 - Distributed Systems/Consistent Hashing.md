@@ -11,7 +11,7 @@ status: reference-quality
 > Quantify precisely *why* modulo hashing catastrophically fails on scaling events, draw the ring and virtual-node mechanics from memory, and contrast this against Redis Cluster's genuinely different hash-slot approach with precision.
 
 > [!info] Referenced everywhere in this handbook
-> This chapter delivers the full depth already promised by the [[Glossary/Consistent Hashing|glossary stub]] and used throughout [[HLD/03 - Design a Distributed Cache (build Redis)/Design a Distributed Cache|Distributed Cache]], [[CS Fundamentals/Databases/Cassandra Internals|Cassandra Internals]], and [[HLD/01 - Design TinyURL (URL Shortener)/Design TinyURL|TinyURL]].
+> This chapter delivers the full depth already promised by the [[Glossary/Consistent Hashing|glossary stub]] and used throughout [[HLD/03 - Design a Distributed Cache (build Redis)/Design a Distributed Cache|Distributed Cache]], [[CS Fundamentals/03 - Databases/Cassandra Internals|Cassandra Internals]], and [[HLD/01 - Design TinyURL (URL Shortener)/Design TinyURL|TinyURL]].
 
 ---
 
@@ -58,10 +58,10 @@ graph LR
 
 ## 4. Real system usage
 
-The original **Amazon Dynamo** paper introduced this technique; **Cassandra** uses it directly with vnodes (see [[CS Fundamentals/Databases/Cassandra Internals|Cassandra Internals]]); **DynamoDB** is built on the same lineage. Load balancers use consistent hashing for **session affinity** (sticky sessions) without needing a shared session store at all — the same client repeatedly hashes to the same backend.
+The original **Amazon Dynamo** paper introduced this technique; **Cassandra** uses it directly with vnodes (see [[CS Fundamentals/03 - Databases/Cassandra Internals|Cassandra Internals]]); **DynamoDB** is built on the same lineage. Load balancers use consistent hashing for **session affinity** (sticky sessions) without needing a shared session store at all — the same client repeatedly hashes to the same backend.
 
 > [!warning] Redis Cluster does NOT use this — say this precisely if compared
-> As covered in [[CS Fundamentals/Caching/Redis Internals|Redis Internals]], Redis Cluster instead uses **16,384 fixed hash slots**, reassigned in whole-slot chunks — a related but genuinely **different** mechanism (discrete, fixed-count slots vs. a continuous ring with virtual nodes). Conflating the two in an interview is a real, catchable imprecision.
+> As covered in [[CS Fundamentals/04 - Caching/Redis Internals|Redis Internals]], Redis Cluster instead uses **16,384 fixed hash slots**, reassigned in whole-slot chunks — a related but genuinely **different** mechanism (discrete, fixed-count slots vs. a continuous ring with virtual nodes). Conflating the two in an interview is a real, catchable imprecision.
 
 ## 5. When it's not needed
 
@@ -81,4 +81,4 @@ A **small, static cluster that never scales** doesn't need this — the entire b
 > Redis Cluster uses a fixed 16,384-slot partitioning (`CRC16(key) mod 16384`), with resharding moving whole slots between nodes — a discrete, coarser-grained scheme, not a continuous ring with virtual nodes, even though both solve the same underlying "minimize remapping on topology change" problem.
 
 ---
-*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[CS Fundamentals/Caching/Redis Internals|Redis Internals]] · [[CS Fundamentals/Databases/Cassandra Internals|Cassandra Internals]] · [[HLD/03 - Design a Distributed Cache (build Redis)/Design a Distributed Cache|Design a Distributed Cache]]*
+*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[CS Fundamentals/04 - Caching/Redis Internals|Redis Internals]] · [[CS Fundamentals/03 - Databases/Cassandra Internals|Cassandra Internals]] · [[HLD/03 - Design a Distributed Cache (build Redis)/Design a Distributed Cache|Design a Distributed Cache]]*

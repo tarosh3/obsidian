@@ -87,4 +87,4 @@ Dataset far exceeding available RAM — Redis isn't designed as a primary store 
 > Consistent hashing maps keys and nodes onto a continuous ring and remaps only a thin slice of keys near a topology change. Redis Cluster instead reassigns whole discrete slots between nodes during resharding — a fixed, coarser-grained partitioning scheme rather than a continuous ring.
 
 ---
-*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[CS Fundamentals/Caching/Caching Strategies|Caching Strategies]] · [[Glossary/Consistent Hashing|Consistent Hashing]]*
+*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[CS Fundamentals/04 - Caching/Caching Strategies|Caching Strategies]] · [[Glossary/Consistent Hashing|Consistent Hashing]]*

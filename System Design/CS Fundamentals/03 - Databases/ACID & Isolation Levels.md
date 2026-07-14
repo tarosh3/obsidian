@@ -79,7 +79,7 @@ Two real mechanisms, worth naming precisely rather than treating isolation as a 
 - **Lock-based isolation** — a transaction acquires locks on rows/ranges it touches, blocking other transactions from conflicting access until it commits. Simple to reason about, but readers can block writers and vice versa.
 - **MVCC (Multi-Version Concurrency Control)** — used by Postgres and MySQL's InnoDB — each transaction sees a consistent *snapshot* of the data as of when it started, while writes create new row versions rather than overwriting in place. Readers never block writers and writers never block readers, at the cost of needing to garbage-collect old row versions.
 > [!info] Already covered
-> MVCC's mechanics are covered in more depth in [[CS Fundamentals/Databases/SQL Query Execution Deep Dive|SQL Query Execution Deep Dive]] — this chapter connects it specifically to *which anomalies it prevents*.
+> MVCC's mechanics are covered in more depth in [[CS Fundamentals/03 - Databases/SQL Query Execution Deep Dive|SQL Query Execution Deep Dive]] — this chapter connects it specifically to *which anomalies it prevents*.
 
 ## What real databases actually default to
 
@@ -88,7 +88,7 @@ Two real mechanisms, worth naming precisely rather than treating isolation as a 
 
 ## ACID vs. BASE
 
-ACID is the strong-consistency end of the same spectrum [[Glossary/BASE|BASE]] sits at the other end of — the same strong-vs-eventual tradeoff already covered generally in [[CS Fundamentals/Distributed Systems/CAP Theorem & PACELC|CAP Theorem & PACELC]], here specifically as the SQL world's concrete instantiation of the "strong" side. Many NoSQL databases deliberately relax some or all ACID guarantees in exchange for horizontal scale and availability — [[CS Fundamentals/Databases/Cassandra Internals|Cassandra Internals]] and [[CS Fundamentals/Databases/MongoDB Internals|MongoDB Internals]] both make this tradeoff explicitly.
+ACID is the strong-consistency end of the same spectrum [[Glossary/BASE|BASE]] sits at the other end of — the same strong-vs-eventual tradeoff already covered generally in [[CS Fundamentals/06 - Distributed Systems/CAP Theorem & PACELC|CAP Theorem & PACELC]], here specifically as the SQL world's concrete instantiation of the "strong" side. Many NoSQL databases deliberately relax some or all ACID guarantees in exchange for horizontal scale and availability — [[CS Fundamentals/03 - Databases/Cassandra Internals|Cassandra Internals]] and [[CS Fundamentals/03 - Databases/MongoDB Internals|MongoDB Internals]] both make this tradeoff explicitly.
 
 ---
 
@@ -101,7 +101,7 @@ ACID is the strong-consistency end of the same spectrum [[Glossary/BASE|BASE]] s
 > Serializable's stronger guarantees come from more aggressive locking or more frequent transaction retries on conflict — real throughput cost under contention. Most systems use a weaker level by default and add targeted fixes (an atomic update, an explicit lock) only where a specific known race condition actually matters, rather than paying Serializable's cost for every transaction in the system.
 
 > [!question]- How does this connect to the CAP theorem?
-> ACID's Isolation and Consistency guarantees are what a single-node (or synchronously-replicated) relational database can afford to offer strongly. The moment a system distributes data across nodes with asynchronous replication — which most systems in this book eventually do at scale — those same guarantees become the CP/AP tradeoff from [[CS Fundamentals/Distributed Systems/CAP Theorem & PACELC|CAP Theorem & PACELC]]: full ACID semantics across a distributed system get expensive fast, which is exactly why systems consciously relax them (BASE) once they outgrow a single node.
+> ACID's Isolation and Consistency guarantees are what a single-node (or synchronously-replicated) relational database can afford to offer strongly. The moment a system distributes data across nodes with asynchronous replication — which most systems in this book eventually do at scale — those same guarantees become the CP/AP tradeoff from [[CS Fundamentals/06 - Distributed Systems/CAP Theorem & PACELC|CAP Theorem & PACELC]]: full ACID semantics across a distributed system get expensive fast, which is exactly why systems consciously relax them (BASE) once they outgrow a single node.
 
 ---
-*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[CS Fundamentals/Databases/SQL Query Execution Deep Dive|SQL Query Execution Deep Dive]] · [[CS Fundamentals/Distributed Systems/CAP Theorem & PACELC|CAP Theorem & PACELC]] · [[Glossary/BASE|BASE]]*
+*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[CS Fundamentals/03 - Databases/SQL Query Execution Deep Dive|SQL Query Execution Deep Dive]] · [[CS Fundamentals/06 - Distributed Systems/CAP Theorem & PACELC|CAP Theorem & PACELC]] · [[Glossary/BASE|BASE]]*

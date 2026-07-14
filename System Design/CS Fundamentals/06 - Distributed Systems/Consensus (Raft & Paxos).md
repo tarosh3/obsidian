@@ -68,7 +68,7 @@ sequenceDiagram
 
 ## What happens during a network partition
 
-If the cluster splits into a minority and a majority side: the **majority side** can still elect a leader (has enough nodes to reach quorum) and continues making progress. The **minority side** can never elect a leader — no candidate there can ever get a majority of votes — so it correctly stops accepting writes rather than risk diverging. This is Raft's CP choice under [[CS Fundamentals/Distributed Systems/CAP Theorem & PACELC|CAP]]: it sacrifices availability on the minority side to guarantee consistency everywhere it does respond.
+If the cluster splits into a minority and a majority side: the **majority side** can still elect a leader (has enough nodes to reach quorum) and continues making progress. The **minority side** can never elect a leader — no candidate there can ever get a majority of votes — so it correctly stops accepting writes rather than risk diverging. This is Raft's CP choice under [[CS Fundamentals/06 - Distributed Systems/CAP Theorem & PACELC|CAP]]: it sacrifices availability on the minority side to guarantee consistency everywhere it does respond.
 
 ## Raft vs. Paxos, and who actually uses which
 
@@ -94,4 +94,4 @@ They solve the identical problem and are provably equivalent in power — Raft's
 > A distributed lock is really "the cluster agrees on who holds the lock right now" — exactly the single-value-agreement problem consensus solves. Real systems (etcd, ZooKeeper) build locks, leader election, and configuration management as *applications* on top of a consensus log, rather than solving distributed agreement freshly for each feature.
 
 ---
-*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[HLD/18 - Design a Distributed Lock Service/Design a Distributed Lock Service|Design a Distributed Lock Service]] · [[CS Fundamentals/Distributed Systems/CAP Theorem & PACELC|CAP Theorem & PACELC]] · [[Glossary/Split-Brain|Split-Brain]] · [[Glossary/Raft (Consensus)|Raft (glossary)]]*
+*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[HLD/18 - Design a Distributed Lock Service/Design a Distributed Lock Service|Design a Distributed Lock Service]] · [[CS Fundamentals/06 - Distributed Systems/CAP Theorem & PACELC|CAP Theorem & PACELC]] · [[Glossary/Split-Brain|Split-Brain]] · [[Glossary/Raft (Consensus)|Raft (glossary)]]*

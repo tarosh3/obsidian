@@ -15,4 +15,4 @@ Three states: **Closed** (normal, calls pass through) → too many failures → 
 > An actual electrical circuit breaker: instead of letting a short circuit keep drawing dangerous current and starting a fire, it trips and cuts power — you fix the problem, then flip it back on.
 
 > [!tip] Full chapter
-> Complete state-machine explanation, a real Go implementation, and how it composes with retry/bulkhead/timeout: [[CS Fundamentals/Distributed Systems/Resilience Patterns|Resilience Patterns (Circuit Breaker, Retry, Bulkhead)]].
+> Complete state-machine explanation, a real Go implementation, and how it composes with retry/bulkhead/timeout: [[CS Fundamentals/06 - Distributed Systems/Resilience Patterns|Resilience Patterns (Circuit Breaker, Retry, Bulkhead)]].

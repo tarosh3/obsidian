@@ -11,7 +11,7 @@ status: reference-quality
 > Explain exactly what happens between a process reading a pointer and the CPU actually getting that data, derive why a server running out of RAM degrades catastrophically rather than gracefully, and explain why `fork()` is "cheap" despite conceptually duplicating an entire process's memory.
 
 > [!info] Picks up where Computer Architecture left off
-> [[CS Fundamentals/Computer Architecture/CPU, Memory & Cache Hierarchy|The Computer Architecture chapter]] established that a pointer is a virtual address, translated to a physical one, and deferred the mechanics to here. This chapter is that mechanism, in full.
+> [[CS Fundamentals/00 - Computer Architecture/CPU, Memory & Cache Hierarchy|The Computer Architecture chapter]] established that a pointer is a virtual address, translated to a physical one, and deferred the mechanics to here. This chapter is that mechanism, in full.
 
 ---
 
@@ -122,4 +122,4 @@ Pages are loaded **lazily** — only when actually accessed, not all at once whe
 - **Copy-on-write** is why `fork()` is cheap — pages are shared until written to, only then physically copied.
 
 ---
-*Related: [[CS Fundamentals/00 - Learning Path|CS Fundamentals Learning Path]] · [[CS Fundamentals/Computer Architecture/CPU, Memory & Cache Hierarchy|CPU, Memory & Cache Hierarchy]] · [[CS Fundamentals/Operating Systems/Processes, Threads & Context Switching|Processes, Threads & Context Switching]]*
+*Related: [[CS Fundamentals/00 - Learning Path|CS Fundamentals Learning Path]] · [[CS Fundamentals/00 - Computer Architecture/CPU, Memory & Cache Hierarchy|CPU, Memory & Cache Hierarchy]] · [[CS Fundamentals/01 - Operating Systems/Processes, Threads & Context Switching|Processes, Threads & Context Switching]]*

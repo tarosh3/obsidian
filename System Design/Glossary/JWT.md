@@ -12,4 +12,4 @@ tags: [system-design, glossary]
 **Pitfall to know cold:** the payload is **encoded, not encrypted** — anyone can base64-decode it and read the claims (never put secrets in a JWT payload). Another classic pitfall: the `alg: none` attack, where some libraries historically accepted a token claiming "no signature algorithm," letting an attacker forge tokens trivially if not properly guarded against.
 
 > [!tip] Full chapter
-> The revocation problem, refresh-token rotation with theft detection, and the full OAuth2 flow: [[CS Fundamentals/Security/Authentication & Authorization|Authentication & Authorization]].
+> The revocation problem, refresh-token rotation with theft detection, and the full OAuth2 flow: [[CS Fundamentals/08 - Security/Authentication & Authorization|Authentication & Authorization]].

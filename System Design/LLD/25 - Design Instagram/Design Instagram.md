@@ -311,4 +311,4 @@ func main() {
 > A background sweep adds operational complexity (a job that must run reliably) for a property that's just as correctly enforced by checking `IsExpired()` at read time — the story data can even be cleaned up later, in bulk, for storage hygiene, without that cleanup being load-bearing for *correctness* the way it would be if reads trusted an un-swept list.
 
 ---
-*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[LLD/06 - Design BookMyShow - Seat Booking/Design BookMyShow - Seat Booking|Design BookMyShow]] (lazy expiry) · [[CS Fundamentals/Design Principles/SOLID Principles|SOLID Principles]]*
+*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[LLD/06 - Design BookMyShow - Seat Booking/Design BookMyShow - Seat Booking|Design BookMyShow]] (lazy expiry) · [[CS Fundamentals/10 - Design Principles/SOLID Principles|SOLID Principles]]*

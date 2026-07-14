@@ -33,7 +33,7 @@ Assume 500M DAU, ~40 messages sent/user/day → **20B messages/day** (~230K mess
 
 **Fix — persistent connections via WebSockets.** The server pushes messages to connected clients the instant they arrive — no polling.
 
-**The new architectural problem this introduces: a user's connection lives on exactly one specific server.** Out of potentially thousands of app-server instances, sending user A a message requires knowing **which one** currently holds A's open connection. This is the core problem this chapter exists to solve — a **connection-routing layer**: a lightweight, fast lookup service (backed by [[CS Fundamentals/Caching/Redis Internals|Redis]] — a direct, simple `userID → serverID` mapping, exactly the kind of use case Redis's plain key-value operations are built for) updated on every connect/disconnect event.
+**The new architectural problem this introduces: a user's connection lives on exactly one specific server.** Out of potentially thousands of app-server instances, sending user A a message requires knowing **which one** currently holds A's open connection. This is the core problem this chapter exists to solve — a **connection-routing layer**: a lightweight, fast lookup service (backed by [[CS Fundamentals/04 - Caching/Redis Internals|Redis]] — a direct, simple `userID → serverID` mapping, exactly the kind of use case Redis's plain key-value operations are built for) updated on every connect/disconnect event.
 
 **Need durability for offline recipients.** If the recipient isn't currently connected, the message must persist (a durable per-user inbox) and either wait for reconnection, or trigger a **push notification** — reusing [[HLD/04 - Design a Notification Service/Design a Notification Service|the exact fan-out/push infrastructure already designed]] rather than building a second, parallel delivery mechanism. The actual message content is fetched via a sync/history API the next time the client connects.
 
@@ -70,7 +70,7 @@ A group message must reach every member — look up each member's connected serv
 
 ### Ordering & idempotency
 
-Messages within one conversation need to preserve sender ordering — if using Kafka internally, keying by conversation ID guarantees this exactly the way [[CS Fundamentals/Messaging & Streaming/Kafka Internals|partition-level ordering]] already works. Delivery must be [[Glossary/Idempotency|idempotent]] — a message ID plus client-side dedup means a retried/redelivered message never renders twice on screen, even if the underlying transport retries it.
+Messages within one conversation need to preserve sender ordering — if using Kafka internally, keying by conversation ID guarantees this exactly the way [[CS Fundamentals/05 - Messaging & Streaming/Kafka Internals|partition-level ordering]] already works. Delivery must be [[Glossary/Idempotency|idempotent]] — a message ID plus client-side dedup means a retried/redelivered message never renders twice on screen, even if the underlying transport retries it.
 
 ---
 
@@ -109,4 +109,4 @@ graph TD
 > A chat-server crash or rolling deploy causes **every client connected to it** to reconnect simultaneously — a thundering-herd variant hitting the load balancer and routing layer all at once. Mitigated with **staggered/jittered reconnect backoff** on the client side, so a server restart doesn't produce a synchronized reconnection spike.
 
 ---
-*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[HLD/04 - Design a Notification Service/Design a Notification Service|Design a Notification Service]] · [[CS Fundamentals/Caching/Redis Internals|Redis Internals]] · [[Glossary/Idempotency|Idempotency]]*
+*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[HLD/04 - Design a Notification Service/Design a Notification Service|Design a Notification Service]] · [[CS Fundamentals/04 - Caching/Redis Internals|Redis Internals]] · [[Glossary/Idempotency|Idempotency]]*

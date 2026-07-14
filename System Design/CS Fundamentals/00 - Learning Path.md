@@ -21,7 +21,7 @@ Everything else in this handbook silently assumes you understand *why* some oper
 
 | # | Chapter | Status |
 |---|---|---|
-| 0.1 | [[CS Fundamentals/Computer Architecture/CPU, Memory & Cache Hierarchy\|CPU, Memory & Cache Hierarchy]] | ✅ |
+| 0.1 | [[CS Fundamentals/00 - Computer Architecture/CPU, Memory & Cache Hierarchy\|CPU, Memory & Cache Hierarchy]] | ✅ |
 
 ## Tier 1 — Operating Systems
 
@@ -29,9 +29,9 @@ How a single machine shares its CPU and memory across many concurrent programs �
 
 | # | Chapter | Status |
 |---|---|---|
-| 1.1 | [[CS Fundamentals/Operating Systems/Processes, Threads & Context Switching\|Processes, Threads & Context Switching]] | ✅ |
-| 1.2 | [[CS Fundamentals/Operating Systems/Memory Management & Virtual Memory\|Memory Management & Virtual Memory]] | ✅ |
-| 1.3 | [[CS Fundamentals/Operating Systems/I-O Models - Blocking, Non-Blocking, and Async\|I/O Models: Blocking, Non-Blocking & Async]] | ✅ |
+| 1.1 | [[CS Fundamentals/01 - Operating Systems/Processes, Threads & Context Switching\|Processes, Threads & Context Switching]] | ✅ |
+| 1.2 | [[CS Fundamentals/01 - Operating Systems/Memory Management & Virtual Memory\|Memory Management & Virtual Memory]] | ✅ |
+| 1.3 | [[CS Fundamentals/01 - Operating Systems/I-O Models - Blocking, Non-Blocking, and Async\|I/O Models: Blocking, Non-Blocking & Async]] | ✅ |
 
 ## Tier 2 — Networking
 
@@ -39,12 +39,12 @@ How machines talk to each other — the layer every distributed system, HLD chap
 
 | # | Chapter | Status |
 |---|---|---|
-| 2.1 | [[CS Fundamentals/Networking/TCP Deep Dive\|TCP Deep Dive]] | ✅ |
-| 2.2 | [[CS Fundamentals/Networking/HTTP Evolution & DNS Resolution\|HTTP Evolution & DNS Resolution]] | ✅ |
-| 2.3 | [[CS Fundamentals/Networking/Load Balancing\|Load Balancing]] | ✅ |
-| 2.4 | [[CS Fundamentals/Networking/API Gateway\|API Gateway]] | ✅ |
-| 2.5 | [[CS Fundamentals/Networking/CDN Internals\|CDN Internals]] | ✅ |
-| 2.6 | [[CS Fundamentals/Networking/Reverse Proxy\|Reverse Proxy]] | ✅ |
+| 2.1 | [[CS Fundamentals/02 - Networking/TCP Deep Dive\|TCP Deep Dive]] | ✅ |
+| 2.2 | [[CS Fundamentals/02 - Networking/HTTP Evolution & DNS Resolution\|HTTP Evolution & DNS Resolution]] | ✅ |
+| 2.3 | [[CS Fundamentals/02 - Networking/Load Balancing\|Load Balancing]] | ✅ |
+| 2.4 | [[CS Fundamentals/02 - Networking/API Gateway\|API Gateway]] | ✅ |
+| 2.5 | [[CS Fundamentals/02 - Networking/CDN Internals\|CDN Internals]] | ✅ |
+| 2.6 | [[CS Fundamentals/02 - Networking/Reverse Proxy\|Reverse Proxy]] | ✅ |
 
 ## Tier 3 — Databases & Storage Engines
 
@@ -53,11 +53,11 @@ How data is durably stored, indexed, and queried — the layer every HLD chapter
 | # | Chapter | Status |
 |---|---|---|
 | 3.1 | Storage Engines (B-Tree vs LSM-Tree, WAL, pages — generalized, before the specific index structure) | 🔜 |
-| 3.2 | [[CS Fundamentals/Databases/Indexes & B+ Trees\|Indexes & B+ Trees]] | ✅ |
-| 3.3 | [[CS Fundamentals/Databases/ACID & Isolation Levels\|ACID & Isolation Levels]] | ✅ |
-| 3.4 | [[CS Fundamentals/Databases/SQL Query Execution Deep Dive\|SQL Query Execution Deep Dive]] | ✅ |
-| 3.5 | [[CS Fundamentals/Databases/Cassandra Internals\|Cassandra Internals]] | ✅ |
-| 3.6 | [[CS Fundamentals/Databases/MongoDB Internals\|MongoDB Internals]] | ✅ |
+| 3.2 | [[CS Fundamentals/03 - Databases/Indexes & B+ Trees\|Indexes & B+ Trees]] | ✅ |
+| 3.3 | [[CS Fundamentals/03 - Databases/ACID & Isolation Levels\|ACID & Isolation Levels]] | ✅ |
+| 3.4 | [[CS Fundamentals/03 - Databases/SQL Query Execution Deep Dive\|SQL Query Execution Deep Dive]] | ✅ |
+| 3.5 | [[CS Fundamentals/03 - Databases/Cassandra Internals\|Cassandra Internals]] | ✅ |
+| 3.6 | [[CS Fundamentals/03 - Databases/MongoDB Internals\|MongoDB Internals]] | ✅ |
 
 ## Tier 4 — Caching
 
@@ -65,9 +65,9 @@ How to avoid paying Tier 3's storage cost on every read — direct application o
 
 | # | Chapter | Status |
 |---|---|---|
-| 4.1 | [[CS Fundamentals/Caching/Caching Strategies\|Caching Strategies]] (general theory first) | ✅ |
-| 4.2 | [[CS Fundamentals/Caching/Redis Internals\|Redis Internals]] | ✅ |
-| 4.3 | [[CS Fundamentals/Caching/Memcached Internals\|Memcached Internals]] | ✅ |
+| 4.1 | [[CS Fundamentals/04 - Caching/Caching Strategies\|Caching Strategies]] (general theory first) | ✅ |
+| 4.2 | [[CS Fundamentals/04 - Caching/Redis Internals\|Redis Internals]] | ✅ |
+| 4.3 | [[CS Fundamentals/04 - Caching/Memcached Internals\|Memcached Internals]] | ✅ |
 
 ## Tier 5 — Messaging & Streaming
 
@@ -75,8 +75,8 @@ How systems communicate asynchronously instead of via direct request/response �
 
 | # | Chapter | Status |
 |---|---|---|
-| 5.1 | [[CS Fundamentals/Messaging & Streaming/Kafka Internals\|Kafka Internals]] | ✅ (deep expansion planned — see note below) |
-| 5.2 | [[CS Fundamentals/Messaging & Streaming/RabbitMQ Internals\|RabbitMQ Internals]] | ✅ |
+| 5.1 | [[CS Fundamentals/05 - Messaging & Streaming/Kafka Internals\|Kafka Internals]] | ✅ (deep expansion planned — see note below) |
+| 5.2 | [[CS Fundamentals/05 - Messaging & Streaming/RabbitMQ Internals\|RabbitMQ Internals]] | ✅ |
 
 > [!info] Kafka gets special treatment
 > Kafka is the one chapter in this handbook explicitly planned to be expanded to standalone-book depth — segments, offset/timestamp indexes, ISR mechanics, exactly-once semantics/transactions, Kafka Streams, Kafka Connect, Schema Registry, and production tuning, on top of what's already written. Flagged here so its eventual depth doesn't feel inconsistent with the rest of Tier 5.
@@ -87,11 +87,11 @@ How multiple machines agree, coordinate, and stay available when parts of the sy
 
 | # | Chapter | Status |
 |---|---|---|
-| 6.1 | [[CS Fundamentals/Distributed Systems/CAP Theorem & PACELC\|CAP Theorem & PACELC]] (the theory framing everything below) | ✅ |
-| 6.2 | [[CS Fundamentals/Distributed Systems/Consistent Hashing\|Consistent Hashing]] | ✅ |
-| 6.3 | [[CS Fundamentals/Distributed Systems/Sharding & Partitioning\|Sharding & Partitioning]] | ✅ |
-| 6.4 | [[CS Fundamentals/Distributed Systems/Consensus (Raft & Paxos)\|Consensus (Raft & Paxos)]] | ✅ |
-| 6.5 | [[CS Fundamentals/Distributed Systems/Resilience Patterns\|Resilience Patterns]] | ✅ |
+| 6.1 | [[CS Fundamentals/06 - Distributed Systems/CAP Theorem & PACELC\|CAP Theorem & PACELC]] (the theory framing everything below) | ✅ |
+| 6.2 | [[CS Fundamentals/06 - Distributed Systems/Consistent Hashing\|Consistent Hashing]] | ✅ |
+| 6.3 | [[CS Fundamentals/06 - Distributed Systems/Sharding & Partitioning\|Sharding & Partitioning]] | ✅ |
+| 6.4 | [[CS Fundamentals/06 - Distributed Systems/Consensus (Raft & Paxos)\|Consensus (Raft & Paxos)]] | ✅ |
+| 6.5 | [[CS Fundamentals/06 - Distributed Systems/Resilience Patterns\|Resilience Patterns]] | ✅ |
 | 6.6 | Service Discovery | 🔜 |
 
 ## Tier 7 — Architecture & Deployment Patterns
@@ -110,7 +110,7 @@ How individual services are packaged, deployed, and composed into a larger syste
 
 | # | Chapter | Status |
 |---|---|---|
-| 8.1 | [[CS Fundamentals/Security/Authentication & Authorization\|Authentication & Authorization]] | ✅ |
+| 8.1 | [[CS Fundamentals/08 - Security/Authentication & Authorization\|Authentication & Authorization]] | ✅ |
 | 8.2 | Broader security fundamentals (encryption at rest/transit, zero trust, secrets management) | 🔜 |
 
 ## Tier 9 — Operational Excellence
@@ -130,8 +130,8 @@ How you know a system is healthy, how you keep it healthy, and how you make it f
 
 | # | Chapter | Status |
 |---|---|---|
-| 10.1 | [[CS Fundamentals/Design Principles/SOLID Principles\|SOLID Principles]] | ✅ |
-| 10.2 | [[CS Fundamentals/Design Principles/Design Patterns Cheat Sheet\|Design Patterns Cheat Sheet]] | ✅ |
+| 10.1 | [[CS Fundamentals/10 - Design Principles/SOLID Principles\|SOLID Principles]] | ✅ |
+| 10.2 | [[CS Fundamentals/10 - Design Principles/Design Patterns Cheat Sheet\|Design Patterns Cheat Sheet]] | ✅ |
 
 ---
 

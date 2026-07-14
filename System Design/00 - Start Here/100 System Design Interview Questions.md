@@ -55,7 +55,7 @@ status: reference-quality
 > [!question]- 8. How do you prevent a cache stampede (thundering herd) on cache expiry?
 > A popular key expiring causes many concurrent requests to all miss simultaneously and hit the database at once. Fix: request coalescing (only one request actually goes to the DB, others wait for its result) or staggered TTLs with jitter.
 > **Layman:** a popular item runs out on a shelf and 500 people simultaneously ask the stock room for a refill — instead, put ONE person in charge of asking the stock room, everyone else just waits on that one answer.
-> **Example:** Go's `singleflight` package, referenced directly in [[CS Fundamentals/Caching/Caching Strategies|Caching Strategies]].
+> **Example:** Go's `singleflight` package, referenced directly in [[CS Fundamentals/04 - Caching/Caching Strategies|Caching Strategies]].
 
 > [!question]- 9. How would you design for a system whose load is extremely spiky (e.g., 100x traffic at 12pm daily)?
 > Predictable spikes get pre-scaled ahead of time (scheduled scaling), not left to reactive auto-scaling which lags the spike's start. Unpredictable spikes need aggressive caching and admission control as the first line of defense since scaling reaction time can't be trusted.
@@ -65,7 +65,7 @@ status: reference-quality
 > [!question]- 10. What's the difference between scaling the application layer and scaling the database layer?
 > The app layer is usually stateless and trivially horizontally scalable — add more identical instances behind a load balancer. The database holds state, so scaling means partitioning (sharding) or replicating, both introducing real consistency and operational complexity the app layer doesn't have.
 > **Layman:** adding more waiters is easy — just hire more, they're interchangeable. Adding more kitchens is hard — you have to decide which ingredients go in which kitchen.
-> **Example:** adding a 10th API server is a non-event; adding a 10th database shard needs a real resharding plan — [[CS Fundamentals/Distributed Systems/Sharding & Partitioning|Sharding & Partitioning]].
+> **Example:** adding a 10th API server is a non-event; adding a 10th database shard needs a real resharding plan — [[CS Fundamentals/06 - Distributed Systems/Sharding & Partitioning|Sharding & Partitioning]].
 
 > [!question]- 11. How do you handle a "hot" API endpoint that a small number of clients hit disproportionately?
 > Per-client rate limiting isolates the heavy client from affecting others; if the load is legitimate (a celebrity account, a viral resource), that specific resource may need its own dedicated caching or sharding treatment rather than the general solution.
@@ -87,12 +87,12 @@ status: reference-quality
 > [!question]- 14. What happens if the load balancer itself fails?
 > A single LB is itself a single point of failure — production deployments run multiple LB instances reached via DNS round-robin or anycast.
 > **Layman:** if the "next available cashier" sign itself breaks, customers don't know where to go — so stores actually have two or three such signs, not just one.
-> **Example:** covered directly in [[CS Fundamentals/Networking/Load Balancing|Load Balancing]] — a commonly-missed detail candidates forget.
+> **Example:** covered directly in [[CS Fundamentals/02 - Networking/Load Balancing|Load Balancing]] — a commonly-missed detail candidates forget.
 
 > [!question]- 15. What happens if your primary database fails?
 > A leader-follower setup fails over by promoting a replica — automatically (via a consensus coordinator like Raft/etcd) or via a runbook. Real gap: writes not yet replicated at the moment of failure are lost unless synchronous replication was used (at a latency cost).
 > **Layman:** the head chef collapses — the sous chef takes over, but any order the head chef hadn't yet told the sous chef about is lost, unless every order was double-written in real time (which slows the kitchen down).
-> **Example:** the direct real-world instance of the tradeoff in [[CS Fundamentals/Distributed Systems/CAP Theorem & PACELC|CAP Theorem & PACELC]].
+> **Example:** the direct real-world instance of the tradeoff in [[CS Fundamentals/06 - Distributed Systems/CAP Theorem & PACELC|CAP Theorem & PACELC]].
 
 > [!question]- 16. How do you detect that a server or node is down?
 > Heartbeats/health checks — a node periodically reports "I'm alive," or is periodically polled; missing a threshold of consecutive heartbeats marks it unhealthy. Too sensitive causes false positives (flapping); too lax delays real detection.
@@ -107,7 +107,7 @@ status: reference-quality
 > [!question]- 18. How do you handle a network partition between two data centers?
 > Depends on the CAP choice already made. A CP system (Raft/Paxos-based) stops accepting writes on the minority side to preserve consistency. An AP system keeps accepting writes on both sides and reconciles once the partition heals.
 > **Layman:** two offices of the same company lose their phone line to each other — the bigger office (majority) keeps making decisions; the smaller, cut-off office (minority) pauses rather than risk making conflicting decisions nobody can reconcile later.
-> **Example:** [[CS Fundamentals/Distributed Systems/Consensus (Raft & Paxos)|the Consensus chapter]] walks through exactly what happens on each side of a Raft cluster partition.
+> **Example:** [[CS Fundamentals/06 - Distributed Systems/Consensus (Raft & Paxos)|the Consensus chapter]] walks through exactly what happens on each side of a Raft cluster partition.
 
 > [!question]- 19. What is a single point of failure, and how do you find them in a design?
 > Any component whose failure takes down the whole system because nothing else can take over. Find them by tracing every request path end-to-end and asking "if this one box died right now, what breaks" — including easy-to-forget ones like the load balancer or DNS.
@@ -122,17 +122,17 @@ status: reference-quality
 > [!question]- 21. What's a retry storm, and how do you prevent it?
 > When a dependency starts failing, every caller retrying immediately *adds to* the load on the already-struggling dependency, worsening the original problem. Prevented by exponential backoff with jitter and a circuit breaker.
 > **Layman:** a struggling waiter drops a tray, and instead of waiting a moment, everyone immediately re-orders at once — burying the already-overwhelmed waiter further. Waiting a random, growing amount of time before re-ordering gives them room to recover.
-> **Example:** full mechanism and Go implementation in [[CS Fundamentals/Distributed Systems/Resilience Patterns|Resilience Patterns]].
+> **Example:** full mechanism and Go implementation in [[CS Fundamentals/06 - Distributed Systems/Resilience Patterns|Resilience Patterns]].
 
 > [!question]- 22. How do you handle a "poison pill" — a malformed message that keeps crashing your consumer?
 > Without a limit, the consumer retries the same bad message forever, blocking everything behind it. Fix: a max-retry count, after which the message moves to a dead-letter queue for separate investigation.
 > **Layman:** one jammed envelope stuck in the mail sorting machine, and the machine keeps trying to process that SAME envelope forever, blocking every letter behind it. Set it aside after a few tries and keep the rest of the mail moving.
-> **Example:** [[CS Fundamentals/Messaging & Streaming/RabbitMQ Internals|RabbitMQ Internals']] dead-letter-exchange discussion.
+> **Example:** [[CS Fundamentals/05 - Messaging & Streaming/RabbitMQ Internals|RabbitMQ Internals']] dead-letter-exchange discussion.
 
 > [!question]- 23. If a downstream service you depend on becomes very slow (not fully down), what do you do?
 > A slow dependency is often worse than a dead one — naive code waits, piling up threads/connections waiting on it, exhausting the *caller's* own resources. Fix: a strict timeout, a circuit breaker, and a bulkhead isolating its resource pool from healthy dependencies.
 > **Layman:** worse than a closed shop is a painfully slow one — customers queue up waiting, tying up your own staff who could be helping elsewhere. Set a maximum wait time, stop sending people there once it's clearly too slow, and don't let it block staff who could help with something else.
-> **Example:** the exact three-pattern combination in [[CS Fundamentals/Distributed Systems/Resilience Patterns|Resilience Patterns]].
+> **Example:** the exact three-pattern combination in [[CS Fundamentals/06 - Distributed Systems/Resilience Patterns|Resilience Patterns]].
 
 > [!question]- 24. How do you design a system to survive an entire data center/region going down?
 > Multi-region deployment with data replicated across regions, plus a mechanism (DNS failover, global load balancer) to redirect traffic. The hard part isn't detecting the outage — it's handling in-flight requests and data that hadn't yet replicated to the surviving region.
@@ -179,7 +179,7 @@ status: reference-quality
 > [!question]- 32. How would you handle two concurrent updates to the same row/record?
 > Pessimistic locking (lock the row for the read-modify-write, blocking others) or optimistic concurrency control (read a version, write back only if unchanged, retry on conflict). Optimistic wins under low contention; pessimistic is safer under high contention.
 > **Layman:** two editors trying to edit the same paragraph of a shared document at once — either lock the paragraph so only one edits at a time (pessimistic), or let both try, and whoever saves last checks "did anyone change this since I started" and redoes it if so (optimistic).
-> **Example:** MVCC (Postgres, MySQL InnoDB) is a sophisticated form of optimistic concurrency — [[CS Fundamentals/Databases/SQL Query Execution Deep Dive|SQL Query Execution Deep Dive]].
+> **Example:** MVCC (Postgres, MySQL InnoDB) is a sophisticated form of optimistic concurrency — [[CS Fundamentals/03 - Databases/SQL Query Execution Deep Dive|SQL Query Execution Deep Dive]].
 
 > [!question]- 33. What's a race condition, precisely, and how is it different from a general bug?
 > A bug whose existence and behavior depend on the specific *timing/interleaving* of concurrent operations — it may pass every test run under light load and fail only under real concurrent traffic.
@@ -194,7 +194,7 @@ status: reference-quality
 > [!question]- 35. If optimistic locking keeps losing the race under high contention, what do you do?
 > A raw infinite-retry loop can starve indefinitely. Cap retries with backoff; if contention is consistently high on one record, that's a signal that record needs a different concurrency strategy (e.g., a serialized-write queue for just that key).
 > **Layman:** if two people keep trying to grab the same popular parking spot and keep bumping into each other, endlessly retrying wastes everyone's time — eventually it's better to just make one of them wait in a line for that specific spot.
-> **Example:** the same underlying idea as the hot-shard-key fix in [[CS Fundamentals/Distributed Systems/Sharding & Partitioning|Sharding & Partitioning]] and [[CS Fundamentals/Databases/MongoDB Internals|MongoDB Internals]].
+> **Example:** the same underlying idea as the hot-shard-key fix in [[CS Fundamentals/06 - Distributed Systems/Sharding & Partitioning|Sharding & Partitioning]] and [[CS Fundamentals/03 - Databases/MongoDB Internals|MongoDB Internals]].
 
 ## 4. Consistency & Data
 
@@ -206,7 +206,7 @@ status: reference-quality
 > [!question]- 37. How do you keep a cache and its database in sync?
 > No perfect answer. Cache-aside (read from cache, on miss read DB and populate) tolerates brief staleness after a write. Write-through updates cache and DB synchronously, closing that gap at the cost of write latency.
 > **Layman:** a whiteboard copy of today's specials in the front window vs. the master menu in the kitchen — update the whiteboard right away (write-through, slower to update) or let it go stale for a bit until someone refreshes it (cache-aside, faster but momentarily wrong).
-> **Example:** full comparison table in [[CS Fundamentals/Caching/Caching Strategies|Caching Strategies]].
+> **Example:** full comparison table in [[CS Fundamentals/04 - Caching/Caching Strategies|Caching Strategies]].
 
 > [!question]- 38. What happens if a write succeeds on the primary but fails to replicate to a read replica?
 > A read hitting that lagging replica returns stale data — this is concretely what "eventual consistency" means in a replicated system. If unacceptable, that read must go to the primary directly, at the cost of adding load back to it.
@@ -221,7 +221,7 @@ status: reference-quality
 > [!question]- 40. What's a "hot" key/partition, and why is it a consistency *and* a performance problem?
 > One key/record receiving disproportionate traffic — even with data evenly hash-distributed, a single celebrity user/product/room concentrates all its traffic on one shard, since hashing distributes *different* keys evenly but can't split *one* key's traffic.
 > **Layman:** splitting customers evenly across 10 checkout lanes works great — until one single celebrity customer needs 1,000 items rung up, and whichever lane they're in is now swamped no matter how evenly everyone ELSE was spread out.
-> **Example:** [[CS Fundamentals/Databases/MongoDB Internals|MongoDB Internals]] — fixed by adding entropy to the key (sub-sharding a hot key into several sub-keys).
+> **Example:** [[CS Fundamentals/03 - Databases/MongoDB Internals|MongoDB Internals]] — fixed by adding entropy to the key (sub-sharding a hot key into several sub-keys).
 
 > [!question]- 41. How do you handle conflicting writes to the same data from two different regions?
 > Needs an explicit conflict-resolution strategy: last-write-wins (simple, can silently lose a legitimate write), vector clocks (detect the conflict, defer resolution), or CRDTs (mathematically designed to merge conflicting updates without losing information).
@@ -236,7 +236,7 @@ status: reference-quality
 > [!question]- 43. How would you design a "seen it already" / deduplication check at scale, without storing every ID forever?
 > A Bloom filter — a compact probabilistic structure answering "definitely not seen" or "possibly seen" with no false negatives, using far less memory than a full ID set, at the cost of a small, tunable false-positive rate.
 > **Layman:** a bouncer with a rough mental list of "definitely haven't seen this face before" vs. "maybe I have" — cheap, small memory, occasionally double-checks someone who wasn't actually there before, but never lets in someone who was already flagged.
-> **Example:** [[Glossary/Bloom Filter|Bloom Filter]] and the cache-penetration-prevention use case in [[CS Fundamentals/Caching/Caching Strategies|Caching Strategies]].
+> **Example:** [[Glossary/Bloom Filter|Bloom Filter]] and the cache-penetration-prevention use case in [[CS Fundamentals/04 - Caching/Caching Strategies|Caching Strategies]].
 
 > [!question]- 44. How do you count something "roughly" at massive scale without exact bookkeeping?
 > Purpose-built probabilistic structures: HyperLogLog for approximate *distinct* counts, Count-Min Sketch for approximate *frequency* counts — both trade a small, quantifiable error for fixed, tiny memory regardless of true cardinality.
@@ -246,7 +246,7 @@ status: reference-quality
 > [!question]- 45. What's a quorum, and why does R + W > N guarantee consistency?
 > With N replicas, requiring R for a read and W for a write to agree, if R + W > N, any read set and any write set are mathematically guaranteed to overlap by at least one replica — a read can never completely miss the most recent write.
 > **Layman:** a group decision needs enough overlap between "who voted last time" and "who's voting now" that at least one person in the new vote definitely remembers the last outcome — that overlap is what quorum guarantees mathematically.
-> **Example:** [[Glossary/Quorum (R + W over N)|Quorum]] and the tunable-consistency discussion in [[CS Fundamentals/Databases/Cassandra Internals|Cassandra Internals]].
+> **Example:** [[Glossary/Quorum (R + W over N)|Quorum]] and the tunable-consistency discussion in [[CS Fundamentals/03 - Databases/Cassandra Internals|Cassandra Internals]].
 
 ## 5. Database Design
 
@@ -256,7 +256,7 @@ status: reference-quality
 > **Example:** Splitwise (genuinely relational — debts, groups, users) vs. a chat message store (simple key-based access, needs horizontal scale — Cassandra fits better).
 
 > [!question]- 47. How do you shard a database, and what actually breaks when you do?
-> Pick a shard key (see [[CS Fundamentals/Distributed Systems/Sharding & Partitioning|Sharding & Partitioning]] for range/hash/directory tradeoffs). What breaks: cross-shard joins/transactions lose single-node ACID guarantees, and any query not filtering by the shard key scatter-gathers across every shard.
+> Pick a shard key (see [[CS Fundamentals/06 - Distributed Systems/Sharding & Partitioning|Sharding & Partitioning]] for range/hash/directory tradeoffs). What breaks: cross-shard joins/transactions lose single-node ACID guarantees, and any query not filtering by the shard key scatter-gathers across every shard.
 > **Layman:** splitting one giant filing cabinet into ten smaller cabinets, one per last-name range — fast if you know exactly whose file you want, but "find everyone born in March" now means checking all ten cabinets instead of one.
 > **Example:** sharding `users` by `user_id` makes "get this user" fast, but "find all users in this city" now queries every shard unless a secondary index exists.
 
@@ -278,17 +278,17 @@ status: reference-quality
 > [!question]- 51. Why are B+ Trees used for indexes instead of a plain binary search tree or hash table?
 > B+ Trees are shallow and wide (high fan-out), designed around disk-page reads — each node read is one disk I/O, so a shallow tree means very few I/Os across millions of rows. A BST is far deeper; a hash index can't support range queries or sorted scans.
 > **Layman:** a phone book organized so you can find any name in 3-4 flips of the page, versus a phone book listed in the order people signed up, where you'd have to check every single page.
-> **Example:** full internals, including why leaf nodes are linked for range scans, in [[CS Fundamentals/Databases/Indexes & B+ Trees|Indexes & B+ Trees]].
+> **Example:** full internals, including why leaf nodes are linked for range scans, in [[CS Fundamentals/03 - Databases/Indexes & B+ Trees|Indexes & B+ Trees]].
 
 > [!question]- 52. What's the difference between a clustered and a non-clustered index?
 > A clustered index determines the physical storage order of rows — only one per table (usually the primary key). A non-clustered index is a separate structure pointing back to the row's location — a table can have many.
 > **Layman:** clustered = the book's pages are physically printed in alphabetical order (only one way to sort the actual pages). Non-clustered = a separate index-card box pointing to which page each name is on — you can have many different index boxes, sorted different ways, without reprinting the book.
-> **Example:** covered with the leftmost-prefix-rule follow-up in [[CS Fundamentals/Databases/Indexes & B+ Trees|Indexes & B+ Trees]].
+> **Example:** covered with the leftmost-prefix-rule follow-up in [[CS Fundamentals/03 - Databases/Indexes & B+ Trees|Indexes & B+ Trees]].
 
 > [!question]- 53. What happens internally when you run a slow SQL query, and how do you speed it up?
 > The query goes through parse → plan → optimize → execute; `EXPLAIN ANALYZE` reveals the chosen plan — commonly a slow query is doing a full table scan because no usable index exists, or an index isn't used due to a type mismatch or a function wrapped around the indexed column.
 > **Layman:** asking "why did it take so long to find this book?" — usually the assistant walked every single shelf instead of using the card catalog that would've pointed straight to it.
-> **Example:** full pipeline breakdown in [[CS Fundamentals/Databases/SQL Query Execution Deep Dive|SQL Query Execution Deep Dive]].
+> **Example:** full pipeline breakdown in [[CS Fundamentals/03 - Databases/SQL Query Execution Deep Dive|SQL Query Execution Deep Dive]].
 
 > [!question]- 54. Why would a database choose a full table scan even when an index exists?
 > The query planner estimates cost — if the filter matches a large fraction of rows, sequential scanning can genuinely be cheaper than the random I/O of jumping through an index for that many matches. A deliberate optimizer decision, not a bug.
@@ -305,7 +305,7 @@ status: reference-quality
 > [!question]- 56. What's the difference between cache-aside, write-through, and write-back?
 > Cache-aside: read from cache, on miss read DB and populate; writes go to DB, cache invalidated/expires. Write-through: every write hits cache and DB synchronously, always in sync, slower writes. Write-back: writes hit cache first, async-flushed to DB later — fastest writes, risks data loss if cache fails before flushing.
 > **Layman:** cache-aside = check your notebook first, only walk to the archive room if it's not written down yet. Write-through = every time you file something in the archive, you also immediately copy it into your notebook. Write-back = you jot it in your notebook first and walk it to the archive later in a batch — fastest for you, risky if your notebook gets lost before you file it.
-> **Example:** full comparison in [[CS Fundamentals/Caching/Caching Strategies|Caching Strategies]].
+> **Example:** full comparison in [[CS Fundamentals/04 - Caching/Caching Strategies|Caching Strategies]].
 
 > [!question]- 57. LRU vs. LFU eviction — when does each make more sense?
 > LRU (evict least-recently-used) assumes recent access predicts near-future access — good general default. LFU (evict least-frequently-used) is better when some items are persistently popular regardless of recent gaps — LRU can wrongly evict a globally popular item just because it wasn't touched in the last few seconds.
@@ -315,7 +315,7 @@ status: reference-quality
 > [!question]- 58. What's cache penetration, and how is it different from a cache stampede?
 > Penetration: repeated requests for a key that *doesn't exist* (can never be cached, every request hits the DB) — often from bad input or attack. Stampede: many concurrent requests for a key that *did* exist but just expired. Different fixes: penetration → Bloom filter; stampede → request coalescing.
 > **Layman:** penetration is someone repeatedly asking the librarian for a book that doesn't exist in the library at all. Stampede is a hundred people all asking for the SAME real book at the exact moment it gets returned and re-shelved.
-> **Example:** both covered side by side in [[CS Fundamentals/Caching/Caching Strategies|Caching Strategies]].
+> **Example:** both covered side by side in [[CS Fundamentals/04 - Caching/Caching Strategies|Caching Strategies]].
 
 > [!question]- 59. How do you decide what TTL to set on a cached item?
 > Balance staleness tolerance against hit rate and backend load — shorter TTL means fresher data but more misses; longer TTL means better hit rate but more staleness risk. For rarely-changing data, a long TTL plus explicit invalidation on write beats relying on a short TTL alone.
@@ -325,7 +325,7 @@ status: reference-quality
 > [!question]- 60. Why is Redis single-threaded for command execution, and how is it still fast?
 > Single-threaded execution avoids locking overhead for concurrent access to shared structures — no parallel execution means no internal race condition to guard against. It stays fast because in-memory ops are already quick, and an event loop (not blocking I/O) handles many concurrent connections despite one execution thread.
 > **Layman:** one chef in a small kitchen doing one dish at a time, perfectly, with zero risk of two cooks colliding over the same pan — fast because each dish is quick, not because there are many chefs.
-> **Example:** full internals in [[CS Fundamentals/Caching/Redis Internals|Redis Internals]].
+> **Example:** full internals in [[CS Fundamentals/04 - Caching/Redis Internals|Redis Internals]].
 
 > [!question]- 61. What's the difference between Redis and Memcached, and when would you pick each?
 > Memcached: simpler, pure key-value, multi-threaded, great raw throughput for simple caching. Redis: rich data structures (sorted sets, lists, hashes) plus persistence, usable as more than a cache.
@@ -389,12 +389,12 @@ status: reference-quality
 > [!question]- 72. How do you authenticate a user's request as it flows through multiple internal microservices?
 > Authenticate once at the edge (API gateway), issue a short-lived, verifiable token (JWT) carrying identity/claims, pass it along the call chain — internal services trust the gateway's verification rather than each re-authenticating original credentials.
 > **Layman:** showing your ID once at the building's front desk, getting a visitor badge, and every office inside trusts the badge instead of asking to see your ID all over again at every door.
-> **Example:** full flow in [[CS Fundamentals/Networking/API Gateway|API Gateway]] and [[CS Fundamentals/Security/Authentication & Authorization|Authentication & Authorization]].
+> **Example:** full flow in [[CS Fundamentals/02 - Networking/API Gateway|API Gateway]] and [[CS Fundamentals/08 - Security/Authentication & Authorization|Authentication & Authorization]].
 
 > [!question]- 73. How do you prevent a DDoS attack from taking your system down?
 > Layered defense: rate limiting at the edge, a CDN/edge network absorbing and filtering volumetric traffic before it reaches origin, and auto-scaling as a last line of defense for legitimate spikes that resemble an attack.
 > **Layman:** a nightclub with a bouncer capping how fast people enter (rate limiting), a big outdoor holding area to absorb a crowd before it reaches the actual door (CDN/edge), and the ability to open more entrances if a real, legitimate crowd shows up (auto-scale).
-> **Example:** [[HLD/14 - Design a Multi-Region Rate Limiter/Design a Multi-Region Rate Limiter|Multi-Region Rate Limiter]] and [[CS Fundamentals/Networking/CDN Internals|CDN Internals]] both directly support this.
+> **Example:** [[HLD/14 - Design a Multi-Region Rate Limiter/Design a Multi-Region Rate Limiter|Multi-Region Rate Limiter]] and [[CS Fundamentals/02 - Networking/CDN Internals|CDN Internals]] both directly support this.
 
 > [!question]- 74. Why rate-limit per-user *and* per-IP, rather than just one?
 > Per-user alone doesn't stop an unauthenticated flood (no identity to key on yet). Per-IP alone punishes legitimate users sharing an IP (corporate/mobile NAT) for one abuser's behavior. Both, at different layers, catches different abuse without over-punishing shared-IP traffic.
@@ -409,12 +409,12 @@ status: reference-quality
 > [!question]- 76. What's the difference between authentication and authorization, precisely?
 > Authentication: "who are you" — verifying identity. Authorization: "what are you allowed to do" — an independent question; a system can perfectly authenticate someone and still correctly deny them a specific resource.
 > **Layman:** showing your ID proves who you are (authentication). Whether the bouncer lets you into the VIP section is a totally separate decision (authorization) — being a verified real person doesn't automatically mean you're on the list.
-> **Example:** full RBAC vs. ABAC treatment in [[CS Fundamentals/Security/Authentication & Authorization|Authentication & Authorization]].
+> **Example:** full RBAC vs. ABAC treatment in [[CS Fundamentals/08 - Security/Authentication & Authorization|Authentication & Authorization]].
 
 > [!question]- 77. How do you handle a leaked/compromised access token?
 > If tokens are short-lived JWTs, the damage window is naturally bounded; the real lever is revoking the associated *refresh* token immediately (server-side, the one piece of state actually tracked), preventing further access tokens once the current one expires.
 > **Layman:** if someone steals your hotel room key card, the hotel can deactivate that specific card immediately at the front desk — you don't need to change the locks on every door in the hotel.
-> **Example:** full refresh-token rotation and theft-detection scheme in [[CS Fundamentals/Security/Authentication & Authorization|Authentication & Authorization]].
+> **Example:** full refresh-token rotation and theft-detection scheme in [[CS Fundamentals/08 - Security/Authentication & Authorization|Authentication & Authorization]].
 
 > [!question]- 78. How would you design rate limiting to stop credential-stuffing / brute-force logins specifically?
 > A stricter, security-specific limit than general API rate limiting — per-account *and* per-IP together, escalating delays or CAPTCHA after a few failures. One of the real cases worth paying for strict, synchronous global coordination rather than the relaxed eventual-sync default.
@@ -461,7 +461,7 @@ status: reference-quality
 > [!question]- 86. How do you monitor a system you don't own but depend on heavily (a third-party API)?
 > Track your *own* observed success rate/latency calling it (you can't instrument their internals), combined with a circuit breaker so a degrading dependency is handled automatically, not just observed.
 > **Layman:** you can't see inside your supplier's factory, but you CAN track how often their deliveries to YOU are late or broken — and have a backup plan ready for when they clearly are.
-> **Example:** monitoring and resilience as two sides of the same problem — [[CS Fundamentals/Distributed Systems/Resilience Patterns|Resilience Patterns]].
+> **Example:** monitoring and resilience as two sides of the same problem — [[CS Fundamentals/06 - Distributed Systems/Resilience Patterns|Resilience Patterns]].
 
 ## 10. Estimation & Numbers
 

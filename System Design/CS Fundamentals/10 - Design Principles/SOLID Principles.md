@@ -99,10 +99,10 @@ SOLID isn't five independent rules — it's five angles on the same underlying g
 > Walk through the [[LLD/01 - Design a Parking Lot/Design a Parking Lot|Parking Lot chapter's]] bad draft directly — it names and fixes an SRP violation, an OCP violation, and a DIP violation with the exact code responsible for each, in sequence, in one refactor.
 
 > [!question]- How does SOLID relate to design patterns?
-> Design patterns are largely *named, reusable solutions* that happen to satisfy SOLID — Strategy is OCP applied to "which algorithm runs"; Observer is ISP/DIP applied to "who gets notified." Recognizing SOLID first, and the pattern as the natural consequence of following it, is a stronger interview answer than memorizing the pattern name in isolation. See [[CS Fundamentals/Design Principles/Design Patterns Cheat Sheet|the Design Patterns Cheat Sheet]] for the full pattern-by-pattern breakdown.
+> Design patterns are largely *named, reusable solutions* that happen to satisfy SOLID — Strategy is OCP applied to "which algorithm runs"; Observer is ISP/DIP applied to "who gets notified." Recognizing SOLID first, and the pattern as the natural consequence of following it, is a stronger interview answer than memorizing the pattern name in isolation. See [[CS Fundamentals/10 - Design Principles/Design Patterns Cheat Sheet|the Design Patterns Cheat Sheet]] for the full pattern-by-pattern breakdown.
 
 > [!question]- Which principle do people misunderstand most often?
 > Liskov Substitution — most engineers correctly avoid obviously-wrong inheritance, but miss the subtler *behavioral* contract violations (an interface implementation that technically satisfies the method signature but breaks an implicit assumption every caller relies on, like a `PricingStrategy` that can return a negative price).
 
 ---
-*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[CS Fundamentals/Design Principles/Design Patterns Cheat Sheet|Design Patterns Cheat Sheet]] · [[LLD/01 - Design a Parking Lot/Design a Parking Lot|Design a Parking Lot]]*
+*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[CS Fundamentals/10 - Design Principles/Design Patterns Cheat Sheet|Design Patterns Cheat Sheet]] · [[LLD/01 - Design a Parking Lot/Design a Parking Lot|Design a Parking Lot]]*

@@ -11,7 +11,7 @@ status: reference-quality
 > Explain exactly what problem each HTTP version fixed over the last, why HTTP/3 moved off TCP entirely, and trace a DNS lookup through every caching layer between browser and authoritative server.
 
 > [!info] Builds on TCP Deep Dive
-> [[CS Fundamentals/Networking/TCP Deep Dive|The TCP chapter]] covers the transport layer these protocols run on (or, for HTTP/3, deliberately don't run on). This chapter doesn't re-derive TCP mechanics — it's about what HTTP and DNS build on top.
+> [[CS Fundamentals/02 - Networking/TCP Deep Dive|The TCP chapter]] covers the transport layer these protocols run on (or, for HTTP/3, deliberately don't run on). This chapter doesn't re-derive TCP mechanics — it's about what HTTP and DNS build on top.
 
 ---
 
@@ -80,7 +80,7 @@ sequenceDiagram
 > If a server's IP needs to change urgently (failover, decommission) but the DNS TTL was set high, clients and resolvers keep routing to the old, now-wrong IP until their cached TTL expires — a real, avoidable extension of downtime. It's why critical records are often kept at low TTLs, or lowered proactively ahead of a planned migration.
 
 > [!question]- Where does a CDN fit into this chain?
-> A CDN typically returns *different* IPs to clients in different geographic locations for the *same* hostname (via DNS-based geo-routing or anycast) — see [[CS Fundamentals/Networking/CDN Internals|CDN Internals]] for the full mechanism.
+> A CDN typically returns *different* IPs to clients in different geographic locations for the *same* hostname (via DNS-based geo-routing or anycast) — see [[CS Fundamentals/02 - Networking/CDN Internals|CDN Internals]] for the full mechanism.
 
 ---
-*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[CS Fundamentals/Networking/TCP Deep Dive|TCP Deep Dive]] · [[CS Fundamentals/Networking/CDN Internals|CDN Internals]]*
+*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[CS Fundamentals/02 - Networking/TCP Deep Dive|TCP Deep Dive]] · [[CS Fundamentals/02 - Networking/CDN Internals|CDN Internals]]*

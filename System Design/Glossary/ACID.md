@@ -12,4 +12,4 @@ tags: [system-design, glossary]
 The strong-consistency counterpart to [[BASE]]'s eventual-consistency tradeoff — SQL databases are typically built around ACID; many NoSQL databases relax some or all of these in exchange for scale/availability.
 
 > [!tip] Full chapter
-> All four guarantees explained precisely, plus the part that actually matters in interviews — isolation levels, and the exact difference between a dirty read, a non-repeatable read, and a phantom read: [[CS Fundamentals/Databases/ACID & Isolation Levels|ACID & Isolation Levels]].
+> All four guarantees explained precisely, plus the part that actually matters in interviews — isolation levels, and the exact difference between a dirty read, a non-repeatable read, and a phantom read: [[CS Fundamentals/03 - Databases/ACID & Isolation Levels|ACID & Isolation Levels]].

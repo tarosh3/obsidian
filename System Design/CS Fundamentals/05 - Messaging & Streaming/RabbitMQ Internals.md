@@ -14,7 +14,7 @@ status: reference-quality
 
 ## 1. Why RabbitMQ exists, and how it differs philosophically from Kafka
 
-RabbitMQ implements **AMQP** (Advanced Message Queuing Protocol) and is built around **flexible routing** — the ability to express "route this message to different destinations based on its attributes" natively in the broker, not in application code. [[CS Fundamentals/Messaging & Streaming/Kafka Internals|Kafka]]'s model (a topic split into partitions) is comparatively flat; RabbitMQ's model has a genuine extra layer of indirection specifically to support rich routing.
+RabbitMQ implements **AMQP** (Advanced Message Queuing Protocol) and is built around **flexible routing** — the ability to express "route this message to different destinations based on its attributes" natively in the broker, not in application code. [[CS Fundamentals/05 - Messaging & Streaming/Kafka Internals|Kafka]]'s model (a topic split into partitions) is comparatively flat; RabbitMQ's model has a genuine extra layer of indirection specifically to support rich routing.
 
 ## 2. The core model: Producer → Exchange → Queue → Consumer
 
@@ -93,4 +93,4 @@ A consumer must explicitly **ack** a message after successfully processing it. I
 > Not naturally — RabbitMQ queues are generally designed to remove messages once acked, with no built-in notion of a long-retained, replayable log. You *could* approximate it by never acking and manually managing retention, but that's fighting the tool's design rather than using it as intended — a genuine sign the workload calls for Kafka instead.
 
 ---
-*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[CS Fundamentals/Messaging & Streaming/Kafka Internals|Kafka Internals]]*
+*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[CS Fundamentals/05 - Messaging & Streaming/Kafka Internals|Kafka Internals]]*

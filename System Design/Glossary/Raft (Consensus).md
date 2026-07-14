@@ -12,6 +12,6 @@ tags: [system-design, glossary]
 Powers real systems like etcd, Consul, and CockroachDB's leader election. The majority requirement is exactly what prevents [[Split-Brain]] — a minority partition can never elect its own leader, because it can't reach a majority.
 
 > [!tip] Full chapter
-> Leader election mechanics, log replication, the safety proof behind the election restriction, and Raft vs. Paxos: [[CS Fundamentals/Distributed Systems/Consensus (Raft & Paxos)|Consensus (Raft & Paxos)]].
+> Leader election mechanics, log replication, the safety proof behind the election restriction, and Raft vs. Paxos: [[CS Fundamentals/06 - Distributed Systems/Consensus (Raft & Paxos)|Consensus (Raft & Paxos)]].
 
 **Used in:** [[HLD/18 - Design a Distributed Lock Service/Design a Distributed Lock Service|Design a Distributed Lock Service]]

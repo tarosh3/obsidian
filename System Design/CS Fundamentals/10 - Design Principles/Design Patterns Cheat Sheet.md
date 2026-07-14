@@ -68,7 +68,7 @@ status: reference-quality
 > [!question]- Facade — *"provide one simple, unified interface in front of a complex subsystem of many moving parts"*
 > **Layman:** a hotel concierge — you ask for "a nice dinner reservation," and the concierge handles calling the restaurant, arranging transport, and confirming the table, without you ever touching those individual systems yourself.
 > **When to use:** a subsystem has many components with a complex internal protocol between them, and most callers only need a small, simple slice of that complexity exposed.
-> **System-design-level example:** [[CS Fundamentals/Networking/API Gateway|the API Gateway]] is architecturally a Facade applied at the whole-system level — one simple entry point in front of dozens of internal services' complexity.
+> **System-design-level example:** [[CS Fundamentals/02 - Networking/API Gateway|the API Gateway]] is architecturally a Facade applied at the whole-system level — one simple entry point in front of dozens of internal services' complexity.
 
 > [!question]- Flyweight — *"share common, immutable state across many objects instead of duplicating it per instance, to save memory"*
 > **Layman:** a print shop keeping one master stencil for a common design and reusing it to stamp thousands of copies, instead of hand-drawing the design fresh onto every single copy.
@@ -172,4 +172,4 @@ status: reference-quality
 > Those 8 are the ones that show up constantly in real interview questions across genuinely different domains (booking systems, notification pipelines, game logic, undo/redo, chat). The other 15 are real and worth recognizing precisely — but building a dedicated, deep case study around each would mean inventing an artificial problem just to justify the pattern, working backward from the solution instead of forward from a real requirement, which is exactly the anti-pattern this book's LLD teaching method (bad code first, feel why it breaks, then refactor) is designed to avoid.
 
 ---
-*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[CS Fundamentals/Design Principles/SOLID Principles|SOLID Principles]]*
+*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[CS Fundamentals/10 - Design Principles/SOLID Principles|SOLID Principles]]*

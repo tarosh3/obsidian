@@ -14,7 +14,7 @@ status: reference-quality
 
 ## What is it, and why does it exist?
 
-I/O operations (network reads, disk reads) are, per [[CS Fundamentals/Computer Architecture/CPU, Memory & Cache Hierarchy|the Computer Architecture chapter's latency table]], orders of magnitude slower than CPU work. A program that **blocks** — stops entirely — while waiting for each I/O operation wastes enormous amounts of CPU time doing nothing.
+I/O operations (network reads, disk reads) are, per [[CS Fundamentals/00 - Computer Architecture/CPU, Memory & Cache Hierarchy|the Computer Architecture chapter's latency table]], orders of magnitude slower than CPU work. A program that **blocks** — stops entirely — while waiting for each I/O operation wastes enormous amounts of CPU time doing nothing.
 
 **The problem this solves:** early server designs used one thread per connection, blocking on I/O within each thread. This works fine for a handful of connections, but each thread costs real memory (a stack, typically 1-8MB) and real context-switching overhead. Scaling to thousands of concurrent connections this way — the famous **"C10K problem"** (handling 10,000 concurrent connections) — becomes untenable: tens of gigabytes just for thread stacks, and the OS scheduler spending significant time just switching between threads instead of doing real work.
 
@@ -46,7 +46,7 @@ flowchart LR
 ```
 
 > [!success] This is the real mechanism behind "Redis/Nginx/Node.js are single-threaded and fast"
-> `epoll` lets a single thread hold open tens of thousands of idle connections at near-zero ongoing cost — the kernel does the bookkeeping of "which sockets have data waiting" and only wakes the application up for the ones that actually matter. This is *precisely* the event loop underneath [[CS Fundamentals/Caching/Redis Internals|Redis's single-threaded architecture]]: one thread, `epoll`-driven, never blocking on an idle connection, never paying thread-per-connection memory or context-switch overhead.
+> `epoll` lets a single thread hold open tens of thousands of idle connections at near-zero ongoing cost — the kernel does the bookkeeping of "which sockets have data waiting" and only wakes the application up for the ones that actually matter. This is *precisely* the event loop underneath [[CS Fundamentals/04 - Caching/Redis Internals|Redis's single-threaded architecture]]: one thread, `epoll`-driven, never blocking on an idle connection, never paying thread-per-connection memory or context-switch overhead.
 
 ### `io_uring` — true async, the newer mechanism
 
@@ -71,7 +71,7 @@ A thread-per-connection (blocking) model doesn't have this specific failure mode
 ## Where this shows up later in this book
 
 > [!info] Direct connections to chapters already written
-> [[CS Fundamentals/Caching/Redis Internals|Redis Internals]]'s single-threaded model is this exact `epoll`-driven event loop, applied to a key-value store. [[CS Fundamentals/Networking/TCP Deep Dive|TCP Deep Dive]]'s socket-level discussion assumes this I/O model underneath. [[CS Fundamentals/Messaging & Streaming/Kafka Internals|Kafka's]] efficient handling of many concurrent producer/consumer connections relies on the same non-blocking I/O foundation.
+> [[CS Fundamentals/04 - Caching/Redis Internals|Redis Internals]]'s single-threaded model is this exact `epoll`-driven event loop, applied to a key-value store. [[CS Fundamentals/02 - Networking/TCP Deep Dive|TCP Deep Dive]]'s socket-level discussion assumes this I/O model underneath. [[CS Fundamentals/05 - Messaging & Streaming/Kafka Internals|Kafka's]] efficient handling of many concurrent producer/consumer connections relies on the same non-blocking I/O foundation.
 
 ---
 
@@ -95,4 +95,4 @@ A thread-per-connection (blocking) model doesn't have this specific failure mode
 - The sharp failure mode of any single-threaded event loop: **one CPU-bound task blocks everything** — the fix is always "move it off the event-loop thread," never "make the event loop smarter."
 
 ---
-*Related: [[CS Fundamentals/00 - Learning Path|CS Fundamentals Learning Path]] · [[CS Fundamentals/Caching/Redis Internals|Redis Internals]] · [[CS Fundamentals/Networking/TCP Deep Dive|TCP Deep Dive]]*
+*Related: [[CS Fundamentals/00 - Learning Path|CS Fundamentals Learning Path]] · [[CS Fundamentals/04 - Caching/Redis Internals|Redis Internals]] · [[CS Fundamentals/02 - Networking/TCP Deep Dive|TCP Deep Dive]]*

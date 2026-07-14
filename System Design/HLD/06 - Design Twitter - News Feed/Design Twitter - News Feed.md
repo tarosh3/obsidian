@@ -44,11 +44,11 @@ Assume 300M total users, 50M daily active, ~2 posts/user/day among active users 
 
 ### Storage for the precomputed feed
 
-A [[CS Fundamentals/Caching/Redis Internals|Redis sorted set]] per user, scored by post timestamp, is a near-perfect fit — this is literally the exact use case the Redis Internals chapter names for **ZSETs**: `O(log n)` insertion, `O(log n)` range queries by score, giving both fast fan-out writes and fast feed reads from one structure.
+A [[CS Fundamentals/04 - Caching/Redis Internals|Redis sorted set]] per user, scored by post timestamp, is a near-perfect fit — this is literally the exact use case the Redis Internals chapter names for **ZSETs**: `O(log n)` insertion, `O(log n)` range queries by score, giving both fast fan-out writes and fast feed reads from one structure.
 
 ### Async fan-out via a queue
 
-Posting publishes an event to [[CS Fundamentals/Messaging & Streaming/Kafka Internals|Kafka]]; a dedicated **fan-out worker** consumes it and performs the `N` feed-list insertions — the exact same asynchronous-fan-out architectural shape already established in [[HLD/04 - Design a Notification Service/Design a Notification Service|the Notification Service chapter]], reused here rather than reinvented. This keeps the original "post a tweet" request fast regardless of how many followers the fan-out eventually touches.
+Posting publishes an event to [[CS Fundamentals/05 - Messaging & Streaming/Kafka Internals|Kafka]]; a dedicated **fan-out worker** consumes it and performs the `N` feed-list insertions — the exact same asynchronous-fan-out architectural shape already established in [[HLD/04 - Design a Notification Service/Design a Notification Service|the Notification Service chapter]], reused here rather than reinvented. This keeps the original "post a tweet" request fast regardless of how many followers the fan-out eventually touches.
 
 ### Ranking (briefly, out of deep-dive scope)
 
@@ -88,10 +88,10 @@ graph TD
 ## Step 8 — Production experience
 
 > [!info] What to monitor
-> Fan-out worker lag ([[CS Fundamentals/Messaging & Streaming/Kafka Internals|Kafka consumer lag]], directly reused as the monitoring primitive). Redis memory usage for feed lists. **Celebrity-path read latency specifically** — since it does real, live query work unlike the `O(1)` normal path, it deserves its own latency SLO, not lumped into an aggregate feed-latency metric.
+> Fan-out worker lag ([[CS Fundamentals/05 - Messaging & Streaming/Kafka Internals|Kafka consumer lag]], directly reused as the monitoring primitive). Redis memory usage for feed lists. **Celebrity-path read latency specifically** — since it does real, live query work unlike the `O(1)` normal path, it deserves its own latency SLO, not lumped into an aggregate feed-latency metric.
 
 > [!tip] A real production technique worth naming
 > Cap each user's precomputed feed list length (e.g. the most recent 1,000 posts) — bounding Redis memory usage. A user scrolling back further than that falls back to a direct query for older posts, trading a slightly slower "load more" experience deep in the feed for bounded memory cost on the hot, common case.
 
 ---
-*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[CS Fundamentals/Caching/Redis Internals|Redis Internals]] · [[HLD/04 - Design a Notification Service/Design a Notification Service|Design a Notification Service]] · [[Glossary/Fan-out vs Fan-in|Fan-out vs Fan-in]]*
+*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[CS Fundamentals/04 - Caching/Redis Internals|Redis Internals]] · [[HLD/04 - Design a Notification Service/Design a Notification Service|Design a Notification Service]] · [[Glossary/Fan-out vs Fan-in|Fan-out vs Fan-in]]*

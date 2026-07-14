@@ -32,7 +32,7 @@ A popular release can draw 100,000 concurrent users chasing a pool of, say, 500 
 
 ## Step 4 — Building it incrementally
 
-**v0 — direct extension of the LLD fix, distributed.** Seat-hold state must live in [[CS Fundamentals/Caching/Redis Internals|Redis]] (not an in-process mutex), since requests for the same show can land on **different** app servers. The atomic check-and-hold becomes a **Redis Lua script** — the identical atomicity mechanism from [[HLD/02 - Design a Rate Limiter/Design a Rate Limiter|the Rate Limiter chapter's]] Lua-script discussion, direct reuse, not a new technique.
+**v0 — direct extension of the LLD fix, distributed.** Seat-hold state must live in [[CS Fundamentals/04 - Caching/Redis Internals|Redis]] (not an in-process mutex), since requests for the same show can land on **different** app servers. The atomic check-and-hold becomes a **Redis Lua script** — the identical atomicity mechanism from [[HLD/02 - Design a Rate Limiter/Design a Rate Limiter|the Rate Limiter chapter's]] Lua-script discussion, direct reuse, not a new technique.
 
 **The real new problem: the thundering herd, even with correctness solved.** 100,000 requests for 500 seats — the vast majority are destined to fail. Naively, all 100,000 still hit the booking service and Redis simultaneously, causing a massive, wasteful load spike even though 99.5% of requests are guaranteed losers before they even start.
 

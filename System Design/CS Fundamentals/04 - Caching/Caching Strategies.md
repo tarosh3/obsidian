@@ -46,7 +46,7 @@ graph LR
 
 - **TTL-based**: simplest — set an expiry, forget about it. Doesn't guarantee freshness; stale data can be served for up to the full TTL window.
 - **Explicit invalidation on write**: accurate, but every write path in the codebase must remember to invalidate — a common source of real bugs the moment someone adds a *new* write path and forgets this step.
-- **Event-driven invalidation**: a change-data-capture stream (e.g. via [[CS Fundamentals/Messaging & Streaming/Kafka Internals|Kafka]]) fires whenever the source of truth changes, triggering invalidation automatically — more robust, at the cost of more infrastructure to run.
+- **Event-driven invalidation**: a change-data-capture stream (e.g. via [[CS Fundamentals/05 - Messaging & Streaming/Kafka Internals|Kafka]]) fires whenever the source of truth changes, triggering invalidation automatically — more robust, at the cost of more infrastructure to run.
 
 ## 5. Cache stampede (thundering herd) — and the real Go fix
 

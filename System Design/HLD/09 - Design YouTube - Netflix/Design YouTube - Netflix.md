@@ -31,7 +31,7 @@ Assume 500M DAU, ~1 hour watched/user/day → **500M hours/day** streamed — th
 
 **v0 — naive.** Store the uploaded video as-is, stream that single file directly to everyone regardless of their device or network. Breaks immediately: a user on a slow mobile connection gets the same massive 4K file as someone on fiber, causing constant buffering — a single format can't serve every playback context well.
 
-**Fix — an async transcoding pipeline.** Upload publishes an event to [[CS Fundamentals/Messaging & Streaming/Kafka Internals|Kafka]] (direct reuse of established messaging infrastructure), triggering transcoding jobs that produce **multiple renditions** (240p through 4K), each chunked into short segments (a few seconds each) — the foundation of adaptive bitrate streaming (ABR) protocols like HLS/DASH.
+**Fix — an async transcoding pipeline.** Upload publishes an event to [[CS Fundamentals/05 - Messaging & Streaming/Kafka Internals|Kafka]] (direct reuse of established messaging infrastructure), triggering transcoding jobs that produce **multiple renditions** (240p through 4K), each chunked into short segments (a few seconds each) — the foundation of adaptive bitrate streaming (ABR) protocols like HLS/DASH.
 
 **Adaptive bitrate streaming, concretely:** the client player continuously monitors its own buffer health and download speed, and requests each **next** short segment at whichever quality level currently fits — meaning a single playback session can switch resolution mid-stream as network conditions change, with **no playback interruption**. This is exactly *why* videos are chunked into short segments per rendition rather than served as one file per quality — switching quality just means requesting the next segment from a different rendition's list.
 
@@ -97,7 +97,7 @@ graph TD
 > Parallelize transcoding of independent segments within a video rather than processing the whole file serially, and use hardware-accelerated encoding where available.
 
 > [!quote]- "How do you decide which videos to keep at the CDN edge vs origin-only?"
-> Popularity-based eviction, directly reusing the [[CS Fundamentals/Caching/Caching Strategies|LRU/LFU eviction concepts]] already covered — applied at CDN scale instead of an application cache.
+> Popularity-based eviction, directly reusing the [[CS Fundamentals/04 - Caching/Caching Strategies|LRU/LFU eviction concepts]] already covered — applied at CDN scale instead of an application cache.
 
 ## Step 8 — Production experience
 
@@ -105,4 +105,4 @@ graph TD
 > Transcoding queue depth/lag (a growing backlog directly delays new-upload availability). CDN cache hit ratio **by region**. **Playback start latency and rebuffering rate** — the actual user-experience metrics that matter most here, more than raw server-side metrics. Storage cost growth — multiple renditions per video multiply storage several-fold over the original alone.
 
 ---
-*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[CS Fundamentals/Messaging & Streaming/Kafka Internals|Kafka Internals]] · [[CS Fundamentals/Caching/Caching Strategies|Caching Strategies]]*
+*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[CS Fundamentals/05 - Messaging & Streaming/Kafka Internals|Kafka Internals]] · [[CS Fundamentals/04 - Caching/Caching Strategies|Caching Strategies]]*

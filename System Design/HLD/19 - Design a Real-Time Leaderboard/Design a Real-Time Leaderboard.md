@@ -29,7 +29,7 @@ Assume 10M active users, ~5 score updates/user/hour during active play — signi
 
 **v0 — naive SQL.** `SELECT * ORDER BY score DESC LIMIT K` for top-K, and a `COUNT` query for a user's rank. Top-K is manageable with an index; the **rank query is the real problem** — "how many rows have a higher score" doesn't benefit from a simple B+Tree equality lookup the way point queries do, and at high QPS with millions of users this becomes a genuine bottleneck — especially since **individual rank checks are the more frequent, more latency-sensitive operation** (most players care about their own rank far more often than browsing the full top-K).
 
-**Fix — Redis Sorted Set (ZSET).** The canonical ZSET use case, directly from [[CS Fundamentals/Caching/Redis Internals|Redis Internals]]: `ZADD leaderboard score user_id` for updates (`O(log n)`), `ZREVRANGE` for top-K (`O(log n + K)`), and critically `ZREVRANK` for a specific user's rank in **`O(log n)`** — solving exactly the bottleneck the SQL approach couldn't.
+**Fix — Redis Sorted Set (ZSET).** The canonical ZSET use case, directly from [[CS Fundamentals/04 - Caching/Redis Internals|Redis Internals]]: `ZADD leaderboard score user_id` for updates (`O(log n)`), `ZREVRANGE` for top-K (`O(log n + K)`), and critically `ZREVRANK` for a specific user's rank in **`O(log n)`** — solving exactly the bottleneck the SQL approach couldn't.
 
 ---
 
@@ -81,4 +81,4 @@ graph TD
 > ZSET memory usage per leaderboard — a very large all-time leaderboard tracking every user forever can grow significant footprint; consider pruning long-inactive users from it. Score-update write latency. Top-K and individual-rank read latency **tracked separately**, since they're different access patterns that can have different latency profiles worth distinguishing.
 
 ---
-*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[CS Fundamentals/Caching/Redis Internals|Redis Internals]] · [[HLD/06 - Design Twitter - News Feed/Design Twitter - News Feed|Design Twitter / News Feed]] (another ZSET use case)*
+*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[CS Fundamentals/04 - Caching/Redis Internals|Redis Internals]] · [[HLD/06 - Design Twitter - News Feed/Design Twitter - News Feed|Design Twitter / News Feed]] (another ZSET use case)*

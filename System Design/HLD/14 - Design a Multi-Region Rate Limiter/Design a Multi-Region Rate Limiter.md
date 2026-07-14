@@ -43,7 +43,7 @@ Overall traffic is the same as the single-region chapter, now split across (say)
 | **Async eventual sync** | Each region enforces locally, but periodically (e.g. every few seconds) shares its count with other regions, adjusting its own local threshold based on the latest known global picture. | Low, local latency. | Allows brief, bounded overshoot during the sync window. |
 
 > [!tip] The async eventual-sync approach is the standard real-world compromise — and it's a live PACELC decision
-> This is precisely [[CS Fundamentals/Distributed Systems/CAP Theorem & PACELC|PACELC's "Else" branch]] — favoring **Latency** over **Consistency** during normal operation, applied concretely to rate limiting instead of a database. Worth stating it as a deliberate, named tradeoff, not a compromise nobody consciously chose.
+> This is precisely [[CS Fundamentals/06 - Distributed Systems/CAP Theorem & PACELC|PACELC's "Else" branch]] — favoring **Latency** over **Consistency** during normal operation, applied concretely to rate limiting instead of a database. Worth stating it as a deliberate, named tradeoff, not a compromise nobody consciously chose.
 
 ---
 
@@ -86,4 +86,4 @@ graph TD
 > Per-region actual usage vs. its intended fair share (detecting skew). Sync lag between regions. Overshoot incidents specifically during partition events — a real, measurable signal of how the theoretical bound plays out in practice.
 
 ---
-*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[HLD/02 - Design a Rate Limiter/Design a Rate Limiter|Design a Rate Limiter]] · [[CS Fundamentals/Distributed Systems/CAP Theorem & PACELC|CAP Theorem & PACELC]]*
+*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[HLD/02 - Design a Rate Limiter/Design a Rate Limiter|Design a Rate Limiter]] · [[CS Fundamentals/06 - Distributed Systems/CAP Theorem & PACELC|CAP Theorem & PACELC]]*
