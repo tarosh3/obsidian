@@ -77,7 +77,7 @@ Interview question → requirement clarification → **bad first draft** (the na
 
 Chapters are written **one at a time, on request** — say *"write [chapter name]"* and it's produced to the full standard above. The three below are already written as the reference standard for everything that follows.
 
-### ✅ Written (reference-quality, read these to calibrate the bar) — 81 chapters so far
+### ✅ Written (reference-quality, read these to calibrate the bar) — 82 chapters so far
 
 > [!success] CS Fundamentals now has a systematic learning order
 > Added [[CS Fundamentals/00 - Learning Path|CS Fundamentals Learning Path]] — a 10-tier, dependency-ordered curriculum replacing "browse folders alphabetically." Also added the true missing prerequisite: [[CS Fundamentals/00 - Computer Architecture/CPU, Memory & Cache Hierarchy|CPU, Memory & Cache Hierarchy]] (Tier 0) — the memory-hierarchy/latency-ratio reasoning every later chapter's "why caching helps" and "why network calls are expensive" arguments actually derive from. More Tier 1/2/3/7/9 chapters (OS memory management, Storage Engines, Reverse Proxy, Microservices vs. Monolith, Event-Driven Architecture, Docker/Kubernetes/Cloud Fundamentals, Observability, Reliability & Performance Engineering) are planned next.

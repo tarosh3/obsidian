@@ -52,7 +52,7 @@ How data is durably stored, indexed, and queried — the layer every HLD chapter
 
 | # | Chapter | Status |
 |---|---|---|
-| 3.1 | Storage Engines (B-Tree vs LSM-Tree, WAL, pages — generalized, before the specific index structure) | 🔜 |
+| 3.1 | [[CS Fundamentals/03 - Databases/Storage Engines - B-Tree vs LSM-Tree\|Storage Engines: B-Tree vs. LSM-Tree]] | ✅ |
 | 3.2 | [[CS Fundamentals/03 - Databases/Indexes & B+ Trees\|Indexes & B+ Trees]] | ✅ |
 | 3.3 | [[CS Fundamentals/03 - Databases/ACID & Isolation Levels\|ACID & Isolation Levels]] | ✅ |
 | 3.4 | [[CS Fundamentals/03 - Databases/SQL Query Execution Deep Dive\|SQL Query Execution Deep Dive]] | ✅ |
