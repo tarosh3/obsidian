@@ -77,10 +77,10 @@ Interview question → requirement clarification → **bad first draft** (the na
 
 Chapters are written **one at a time, on request** — say *"write [chapter name]"* and it's produced to the full standard above. The three below are already written as the reference standard for everything that follows.
 
-### ✅ Written (reference-quality, read these to calibrate the bar) — 92 chapters so far
+### ✅ Written (reference-quality, read these to calibrate the bar) — 95 chapters so far
 
-> [!success] CS Fundamentals learning path fully complete — all 11 tiers
-> [[CS Fundamentals/00 - Learning Path|The CS Fundamentals Learning Path]] now has zero pending items — Tiers 0 through 10, Computer Architecture through Software Design Principles, folders numbered 00-10 with no gaps, sidebar order matching dependency order exactly.
+> [!success] CS Fundamentals learning path fully complete — all 11 tiers, all mega-prompt required chapters covered
+> [[CS Fundamentals/00 - Learning Path|The CS Fundamentals Learning Path]] has zero pending items. The last 3 gaps from a full cross-check against the original foundation-handbook spec are now closed: Kafka expanded to standalone-book depth ([[CS Fundamentals/05 - Messaging & Streaming/Kafka Ecosystem and Production Patterns|Kafka Ecosystem & Production Patterns]] — Streams, Connect, Schema Registry, Avro/Protobuf, Outbox Pattern, Kafka-style DLQ, capacity planning), [[CS Fundamentals/05 - Messaging & Streaming/Kafka Alternatives - Pulsar, NATS and Redis Streams|Kafka Alternatives]] (Pulsar's compute/storage separation, NATS, Redis Streams), and [[CS Fundamentals/06 - Distributed Systems/Scalability Patterns|Scalability Patterns]] (the consolidated, named reference tying together every scaling lever already used throughout this handbook).
 
 > [!success] CS Fundamentals now has a systematic learning order
 > Added [[CS Fundamentals/00 - Learning Path|CS Fundamentals Learning Path]] — a 10-tier, dependency-ordered curriculum replacing "browse folders alphabetically." Also added the true missing prerequisite: [[CS Fundamentals/00 - Computer Architecture/CPU, Memory & Cache Hierarchy|CPU, Memory & Cache Hierarchy]] (Tier 0) — the memory-hierarchy/latency-ratio reasoning every later chapter's "why caching helps" and "why network calls are expensive" arguments actually derive from. More Tier 1/2/3/7/9 chapters (OS memory management, Storage Engines, Reverse Proxy, Microservices vs. Monolith, Event-Driven Architecture, Docker/Kubernetes/Cloud Fundamentals, Observability, Reliability & Performance Engineering) are planned next.
@@ -198,8 +198,8 @@ Chapters are written **one at a time, on request** — say *"write [chapter name
 **Security:** Authentication & Authorization (sessions, JWT, OAuth2, refresh-token rotation) ✅ · Encryption at Rest/Transit · Zero Trust · Secrets Management.
 **Databases:** Indexes & B+ Trees ✅ · SQL Query Execution Deep Dive ✅ · Cassandra Internals ✅ · MongoDB Internals ✅ · Partitioning/Sharding ✅ (see Distributed Systems) · ACID & Isolation Levels (dirty/non-repeatable/phantom reads) ✅ · Write-Ahead Log (WAL) · Replication · SQL vs NoSQL.
 **Caching:** Caching Strategies ✅ · Redis Internals ✅ · Memcached Internals ✅.
-**Messaging & Streaming:** Kafka Internals ✅ · RabbitMQ Internals ✅ · Pulsar · NATS · Redis Streams.
-**Distributed Systems:** CAP & PACELC ✅ · Consistent Hashing ✅ · Raft & Paxos / Consensus ✅ · Sharding & Partitioning ✅ · Resilience Patterns (Circuit Breaker, Retry, Bulkhead) ✅ · Gossip Protocol · Leader Election · Vector Clocks & Lamport Clocks · Distributed Locks · Idempotency · ZooKeeper.
+**Messaging & Streaming:** Kafka Internals ✅ · Kafka Ecosystem & Production Patterns (Streams, Connect, Schema Registry, Avro/Protobuf, Outbox, DLQ) ✅ · RabbitMQ Internals ✅ · Pulsar ✅ · NATS ✅ · Redis Streams ✅.
+**Distributed Systems:** CAP & PACELC ✅ · Consistent Hashing ✅ · Raft & Paxos / Consensus ✅ · Sharding & Partitioning ✅ · Resilience Patterns (Circuit Breaker, Retry, Bulkhead) ✅ · Service Discovery ✅ · Scalability Patterns ✅ · Gossip Protocol · Leader Election · Vector Clocks & Lamport Clocks · Distributed Locks · Idempotency · ZooKeeper.
 **Design Principles:** SOLID Principles (all 5, with the code proving each) ✅ · Design Patterns Cheat Sheet (all 23 GoF patterns) ✅.
 
 ---

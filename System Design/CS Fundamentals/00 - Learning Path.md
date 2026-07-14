@@ -78,11 +78,13 @@ How systems communicate asynchronously instead of via direct request/response �
 
 | # | Chapter | Status |
 |---|---|---|
-| 5.1 | [[CS Fundamentals/05 - Messaging & Streaming/Kafka Internals\|Kafka Internals]] | ✅ (deep expansion planned — see note below) |
-| 5.2 | [[CS Fundamentals/05 - Messaging & Streaming/RabbitMQ Internals\|RabbitMQ Internals]] | ✅ |
+| 5.1 | [[CS Fundamentals/05 - Messaging & Streaming/Kafka Internals\|Kafka Internals]] | ✅ |
+| 5.2 | [[CS Fundamentals/05 - Messaging & Streaming/Kafka Ecosystem and Production Patterns\|Kafka Ecosystem & Production Patterns]] (Streams, Connect, Schema Registry, Avro/Protobuf, Outbox, DLQ, capacity planning) | ✅ |
+| 5.3 | [[CS Fundamentals/05 - Messaging & Streaming/Kafka Alternatives - Pulsar, NATS and Redis Streams\|Kafka Alternatives: Pulsar, NATS & Redis Streams]] | ✅ |
+| 5.4 | [[CS Fundamentals/05 - Messaging & Streaming/RabbitMQ Internals\|RabbitMQ Internals]] | ✅ |
 
-> [!info] Kafka gets special treatment
-> Kafka is the one chapter in this handbook explicitly planned to be expanded to standalone-book depth — segments, offset/timestamp indexes, ISR mechanics, exactly-once semantics/transactions, Kafka Streams, Kafka Connect, Schema Registry, and production tuning, on top of what's already written. Flagged here so its eventual depth doesn't feel inconsistent with the rest of Tier 5.
+> [!success] Kafka now gets the standalone-book depth originally planned
+> Across [[CS Fundamentals/05 - Messaging & Streaming/Kafka Internals|Kafka Internals]] and [[CS Fundamentals/05 - Messaging & Streaming/Kafka Ecosystem and Production Patterns|Kafka Ecosystem & Production Patterns]]: segments, offset/timestamp indexes, ISR mechanics, exactly-once semantics/transactions, Kafka Streams, Kafka Connect, Schema Registry, Avro/Protobuf, the Outbox Pattern, Kafka-style DLQ, and capacity planning are all covered.
 
 ## Tier 6 — Distributed Systems
 
@@ -96,6 +98,7 @@ How multiple machines agree, coordinate, and stay available when parts of the sy
 | 6.4 | [[CS Fundamentals/06 - Distributed Systems/Consensus (Raft & Paxos)\|Consensus (Raft & Paxos)]] | ✅ |
 | 6.5 | [[CS Fundamentals/06 - Distributed Systems/Resilience Patterns\|Resilience Patterns]] | ✅ |
 | 6.6 | [[CS Fundamentals/06 - Distributed Systems/Service Discovery\|Service Discovery]] | ✅ |
+| 6.7 | [[CS Fundamentals/06 - Distributed Systems/Scalability Patterns\|Scalability Patterns]] (consolidated reference — horizontal/vertical, replicas, sharding, caching, async absorption, geography) | ✅ |
 
 ## Tier 7 — Architecture & Deployment Patterns
 
