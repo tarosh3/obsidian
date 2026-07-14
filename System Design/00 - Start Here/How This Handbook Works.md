@@ -13,6 +13,9 @@ status: living-document
 > [!tip] Night-before-the-interview drilling
 > [[00 - Start Here/100 System Design Interview Questions|100 System Design Interview Questions]] — the cross-cutting questions that recur in almost every interview regardless of which system is being designed (scaling, failure handling, race conditions, consistency, estimation), separate from each chapter's own case-study-specific Q&A.
 
+> [!tip] Don't know where to start in CS Fundamentals?
+> [[CS Fundamentals/00 - Learning Path|CS Fundamentals Learning Path]] — a dependency-ordered curriculum (Computer Architecture → OS → Networking → Databases → Caching → Messaging → Distributed Systems → Architecture Patterns → Security → Operational Excellence → Design Principles), not just a folder listing. Read this before diving into individual chapters.
+
 ---
 
 ## The three pillars
@@ -74,7 +77,10 @@ Interview question → requirement clarification → **bad first draft** (the na
 
 Chapters are written **one at a time, on request** — say *"write [chapter name]"* and it's produced to the full standard above. The three below are already written as the reference standard for everything that follows.
 
-### ✅ Written (reference-quality, read these to calibrate the bar) — 76 chapters so far
+### ✅ Written (reference-quality, read these to calibrate the bar) — 77 chapters so far
+
+> [!success] CS Fundamentals now has a systematic learning order
+> Added [[CS Fundamentals/00 - Learning Path|CS Fundamentals Learning Path]] — a 10-tier, dependency-ordered curriculum replacing "browse folders alphabetically." Also added the true missing prerequisite: [[CS Fundamentals/Computer Architecture/CPU, Memory & Cache Hierarchy|CPU, Memory & Cache Hierarchy]] (Tier 0) — the memory-hierarchy/latency-ratio reasoning every later chapter's "why caching helps" and "why network calls are expensive" arguments actually derive from. More Tier 1/2/3/7/9 chapters (OS memory management, Storage Engines, Reverse Proxy, Microservices vs. Monolith, Event-Driven Architecture, Docker/Kubernetes/Cloud Fundamentals, Observability, Reliability & Performance Engineering) are planned next.
 
 > [!success] Second gap-audit pass: ACID, SOLID, Design Patterns
 > Added [[CS Fundamentals/Databases/ACID & Isolation Levels|ACID & Isolation Levels]] (previously only a broken glossary stub), [[CS Fundamentals/Design Principles/SOLID Principles|SOLID Principles]], and [[CS Fundamentals/Design Principles/Design Patterns Cheat Sheet|Design Patterns Cheat Sheet]] (all 23 GoF patterns — 8 with full LLD chapter treatment, 15 as cheat-sheet-level entries) — consolidating principles that were previously taught correctly but only scattered inline across individual LLD chapters.
