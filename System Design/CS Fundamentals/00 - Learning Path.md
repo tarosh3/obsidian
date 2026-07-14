@@ -100,11 +100,11 @@ How individual services are packaged, deployed, and composed into a larger syste
 
 | # | Chapter | Status |
 |---|---|---|
-| 7.1 | Monolith vs. Microservices | 🔜 |
-| 7.2 | Event-Driven Architecture | 🔜 |
-| 7.3 | Docker Fundamentals | 🔜 |
-| 7.4 | Kubernetes Fundamentals | 🔜 |
-| 7.5 | Cloud Fundamentals (IaaS/PaaS/SaaS, managed services tradeoffs) | 🔜 |
+| 7.1 | [[CS Fundamentals/07 - Architecture and Deployment Patterns/Monolith vs Microservices\|Monolith vs. Microservices]] | ✅ |
+| 7.2 | [[CS Fundamentals/07 - Architecture and Deployment Patterns/Event-Driven Architecture\|Event-Driven Architecture]] | ✅ |
+| 7.3 | [[CS Fundamentals/07 - Architecture and Deployment Patterns/Docker Fundamentals\|Docker Fundamentals]] | ✅ |
+| 7.4 | [[CS Fundamentals/07 - Architecture and Deployment Patterns/Kubernetes Fundamentals\|Kubernetes Fundamentals]] | ✅ |
+| 7.5 | [[CS Fundamentals/07 - Architecture and Deployment Patterns/Cloud Fundamentals\|Cloud Fundamentals]] | ✅ |
 
 ## Tier 8 — Security
 
