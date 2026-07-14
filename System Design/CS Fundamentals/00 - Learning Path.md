@@ -10,6 +10,9 @@ status: living-document
 > [!abstract] What this is
 > Not a folder listing — a **dependency-ordered curriculum**. Each tier below assumes you've internalized the tiers above it. This is the fix for "CS Fundamentals feels unordered": read top to bottom, not alphabetically by folder name. By the end, you should be able to understand almost any HLD or LLD chapter in this handbook without a knowledge gap forcing you to backtrack.
 
+> [!success] All 11 tiers complete
+> Tiers 0-10 are fully written — Computer Architecture through Software Design Principles, including Storage Engines, Service Discovery, the full Architecture & Deployment Patterns tier (Monolith vs. Microservices, Event-Driven Architecture, Docker, Kubernetes, Cloud Fundamentals), broader Security, and the full Operational Excellence tier (Observability, Reliability Engineering, Performance Engineering). The folder numbering (00-10, with no remaining gaps) now matches this table exactly.
+
 > [!tip] How to use this
 > If you're already confident in a tier (e.g., you've built production systems using TCP/HTTP for years), skim it for the specific framing this book uses and move on — every chapter is written so its "why this matters later" callouts are the fast way to check whether you already have the mental model.
 
@@ -111,7 +114,7 @@ How individual services are packaged, deployed, and composed into a larger syste
 | # | Chapter | Status |
 |---|---|---|
 | 8.1 | [[CS Fundamentals/08 - Security/Authentication & Authorization\|Authentication & Authorization]] | ✅ |
-| 8.2 | Broader security fundamentals (encryption at rest/transit, zero trust, secrets management) | 🔜 |
+| 8.2 | [[CS Fundamentals/08 - Security/Encryption, Zero Trust and Secrets Management\|Encryption, Zero Trust & Secrets Management]] | ✅ |
 
 ## Tier 9 — Operational Excellence
 
@@ -119,9 +122,9 @@ How you know a system is healthy, how you keep it healthy, and how you make it f
 
 | # | Chapter | Status |
 |---|---|---|
-| 9.1 | Observability (metrics, logs, traces — the general theory; [[HLD/20 - Design a Log Aggregation and Monitoring System/Design a Log Aggregation and Monitoring System|the Log Aggregation HLD chapter]] is the applied case study) | 🔜 |
-| 9.2 | Reliability Engineering (SRE practices, error budgets, SLA/SLO/SLI in depth beyond the glossary entry) | 🔜 |
-| 9.3 | Performance Engineering (profiling, benchmarking, load testing methodology) | 🔜 |
+| 9.1 | [[CS Fundamentals/09 - Operational Excellence/Observability - Metrics, Logs and Traces\|Observability: Metrics, Logs & Traces]] | ✅ |
+| 9.2 | [[CS Fundamentals/09 - Operational Excellence/Reliability Engineering\|Reliability Engineering]] | ✅ |
+| 9.3 | [[CS Fundamentals/09 - Operational Excellence/Performance Engineering\|Performance Engineering]] | ✅ |
 
 ## Tier 10 — Software Design Principles
 
@@ -139,7 +142,7 @@ How you know a system is healthy, how you keep it healthy, and how you make it f
 
 1. **Read Tiers 0-2 once, fully**, even if you think you know networking — this handbook's specific framing (the latency-ratio table, the TCP/HTTP layering) gets referenced by name throughout later HLD chapters.
 2. **Read Tiers 3-6 as you encounter HLD chapters that need them** — every HLD chapter links to the specific CS Fundamentals chapter it depends on, exactly when it's needed, rather than requiring you to have pre-read everything.
-3. **Tier 7-9 (mostly 🔜)** are the newest additions to this curriculum — genuinely important for senior-level system design conversations (deployment, observability, reliability) but less likely to be the *center* of a single interview question the way Tier 3-6 topics are.
+3. **Tiers 7-9** are the newest additions to this curriculum — genuinely important for senior-level system design conversations (deployment, observability, reliability) but less likely to be the *center* of a single interview question the way Tier 3-6 topics are.
 4. **Tier 10** — read alongside your first LLD chapter, not before it; the principles land better with a concrete bad-draft-to-refactor example in front of you.
 
 ---
