@@ -92,7 +92,7 @@ How multiple machines agree, coordinate, and stay available when parts of the sy
 | 6.3 | [[CS Fundamentals/06 - Distributed Systems/Sharding & Partitioning\|Sharding & Partitioning]] | ✅ |
 | 6.4 | [[CS Fundamentals/06 - Distributed Systems/Consensus (Raft & Paxos)\|Consensus (Raft & Paxos)]] | ✅ |
 | 6.5 | [[CS Fundamentals/06 - Distributed Systems/Resilience Patterns\|Resilience Patterns]] | ✅ |
-| 6.6 | Service Discovery | 🔜 |
+| 6.6 | [[CS Fundamentals/06 - Distributed Systems/Service Discovery\|Service Discovery]] | ✅ |
 
 ## Tier 7 — Architecture & Deployment Patterns
 
