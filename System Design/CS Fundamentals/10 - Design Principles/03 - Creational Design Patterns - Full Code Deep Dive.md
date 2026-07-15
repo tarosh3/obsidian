@@ -8,16 +8,110 @@ status: reference-quality
 # Creational Design Patterns — Full Code Deep Dive
 
 > [!abstract] What you'll be able to do after this chapter
-> For every creational pattern except Factory Method (which already has a full LLD chapter), see the exact bad code, feel exactly why it breaks, and see the exact refactor that fixes it — real, compilable-shaped Go, not pseudocode.
+> For every one of the 5 creational patterns, see a complete, runnable "without the pattern" program, the exact same problem solved "with the pattern," and a one-line trick for telling this pattern apart from the one it's most often confused with.
 
 > [!info] Companion to the cheat sheet
-> [[CS Fundamentals/10 - Design Principles/Design Patterns Cheat Sheet|Design Patterns Cheat Sheet]] gives you the one-paragraph recognition version of all 23 GoF patterns. This chapter (and its two Structural/Behavioral siblings) gives you the thing the cheat sheet explicitly said it wouldn't: a real "before" and "after" for the patterns that don't have a full LLD case study built around them.
+> [[CS Fundamentals/10 - Design Principles/02 - Design Patterns Cheat Sheet|Design Patterns Cheat Sheet]] gives you the one-paragraph recognition version of all 23 GoF patterns. This chapter (and its two Structural/Behavioral siblings) gives you real, complete Go programs for every single one — including Factory Method, which also has a full system built around it in [[LLD/01 - Design a Parking Lot/Design a Parking Lot|Design a Parking Lot]] if you want the deeper, multi-requirement version.
 
 ---
 
-## Factory Method — recap only
+## Factory Method
 
-Already has a full, real case study: [[LLD/01 - Design a Parking Lot/Design a Parking Lot|Design a Parking Lot]]'s `PricingStrategyFactory`. **Layman:** ordering "a coffee" without specifying the machine — the barista (factory) picks the concrete steps. **When to use:** the exact concrete type isn't known until runtime, and callers should depend only on the abstract type. Nothing to add here that chapter doesn't already cover in full.
+> [!example] Layman
+> Ordering "a coffee" without specifying the machine — the barista (factory) picks the concrete steps.
+
+**Trigger:** "create the right type without the caller choosing the concrete class"
+**When to use:** the exact concrete type isn't known until runtime, and callers should depend only on the abstract type.
+
+> [!tip] Identification trick
+> If the requirement is "give me a `Foo`, I don't care exactly which kind" → Factory Method. If it's "give me a whole *matching set* of `Foo` + `Bar` + `Baz` that must stay consistent with each other" → that's the next pattern, Abstract Factory, not this one.
+
+**Without the pattern:**
+
+```go
+package main
+
+import "fmt"
+
+type EmailNotifier struct{}
+
+func (EmailNotifier) Send(msg string) { fmt.Println("email:", msg) }
+
+type SMSNotifier struct{}
+
+func (SMSNotifier) Send(msg string) { fmt.Println("sms:", msg) }
+
+func main() {
+	kind := "sms"
+	msg := "server down"
+
+	// caller must know about every concrete type and branch itself
+	if kind == "email" {
+		n := EmailNotifier{}
+		n.Send(msg)
+	} else if kind == "sms" {
+		n := SMSNotifier{}
+		n.Send(msg)
+	}
+	// adding "push" later means finding and editing every call site that does this branching
+}
+
+// Output:
+// sms: server down
+```
+
+**With Factory Method:**
+
+```go
+package main
+
+import "fmt"
+
+type Notifier interface {
+	Send(msg string)
+}
+
+type EmailNotifier struct{}
+
+func (EmailNotifier) Send(msg string) { fmt.Println("email:", msg) }
+
+type SMSNotifier struct{}
+
+func (SMSNotifier) Send(msg string) { fmt.Println("sms:", msg) }
+
+type PushNotifier struct{}
+
+func (PushNotifier) Send(msg string) { fmt.Println("push:", msg) }
+
+// Factory Method: one function owns "which concrete type to build"
+func NewNotifier(kind string) Notifier {
+	switch kind {
+	case "email":
+		return EmailNotifier{}
+	case "sms":
+		return SMSNotifier{}
+	case "push":
+		return PushNotifier{}
+	default:
+		return nil
+	}
+}
+
+func main() {
+	n := NewNotifier("sms")
+	n.Send("server down")
+	// caller never imports EmailNotifier/SMSNotifier directly — only Notifier + NewNotifier
+}
+
+// Output:
+// sms: server down
+```
+
+> [!info] Full system-design depth
+> [[LLD/01 - Design a Parking Lot/Design a Parking Lot|Design a Parking Lot]] builds a real `PricingStrategyFactory` inside a full multi-requirement system — read it once the shape above is comfortable.
+
+> [!warning] Tradeoffs
+> A new concrete type means editing the factory function — fine, that's the *one* place allowed to know about every concrete type; everywhere else only depends on the interface.
 
 ---
 
@@ -26,27 +120,58 @@ Already has a full, real case study: [[LLD/01 - Design a Parking Lot/Design a Pa
 > [!example] Layman
 > Ordering a "meal combo" where burger, fries, and drink are all picked to match one theme — the whole family swaps together, never piece by piece.
 
-**When to use:** you need to guarantee several related objects come from the same consistent family — a UI toolkit's light vs. dark theme, where a light button must never end up paired with a dark checkbox.
+**Trigger:** "guarantee several related objects come from the same consistent family"
+**When to use:** a UI toolkit's light vs. dark theme, where a light button must never end up paired with a dark checkbox.
+
+> [!tip] Identification trick
+> Count how many related objects need to be created *together* and stay consistent. One object → Factory Method. A whole matched family (2 or more objects that must never be mismatched) → Abstract Factory.
+
+**Without the pattern:**
 
 ```go
-// BEFORE — caller assembles the family by hand; nothing stops a mismatch
+package main
+
+import "fmt"
+
 type LightButton struct{}
+
+func (LightButton) Render() string { return "light button" }
+
 type DarkButton struct{}
+
+func (DarkButton) Render() string { return "dark button" }
+
 type LightCheckbox struct{}
+
+func (LightCheckbox) Render() string { return "light checkbox" }
+
 type DarkCheckbox struct{}
+
+func (DarkCheckbox) Render() string { return "dark checkbox" }
 
 func RenderUIBad(dark bool) {
 	if dark {
 		btn := DarkButton{}
-		chk := LightCheckbox{} // BUG: mismatched theme — compiles fine, looks wrong at runtime
-		_ = btn
-		_ = chk
+		chk := LightCheckbox{} // BUG: mismatched theme — compiles fine, wrong at runtime
+		fmt.Println(btn.Render(), chk.Render())
 	}
 }
+
+func main() {
+	RenderUIBad(true) // nothing in the type system prevents this mismatch
+}
+
+// Output:
+// dark button light checkbox
 ```
 
+**With Abstract Factory:**
+
 ```go
-// AFTER — Abstract Factory guarantees a matched family, by construction
+package main
+
+import "fmt"
+
 type Button interface{ Render() string }
 type Checkbox interface{ Render() string }
 
@@ -56,20 +181,28 @@ type UIFactory interface {
 }
 
 type LightButton struct{}
+
 func (LightButton) Render() string { return "light button" }
+
 type LightCheckbox struct{}
+
 func (LightCheckbox) Render() string { return "light checkbox" }
 
 type LightFactory struct{}
+
 func (LightFactory) CreateButton() Button     { return LightButton{} }
 func (LightFactory) CreateCheckbox() Checkbox { return LightCheckbox{} }
 
 type DarkButton struct{}
+
 func (DarkButton) Render() string { return "dark button" }
+
 type DarkCheckbox struct{}
+
 func (DarkCheckbox) Render() string { return "dark checkbox" }
 
 type DarkFactory struct{}
+
 func (DarkFactory) CreateButton() Button     { return DarkButton{} }
 func (DarkFactory) CreateCheckbox() Checkbox { return DarkCheckbox{} }
 
@@ -78,6 +211,13 @@ func RenderUI(f UIFactory) {
 	chk := f.CreateCheckbox()
 	fmt.Println(btn.Render(), chk.Render()) // ALWAYS matched — the factory enforces it
 }
+
+func main() {
+	RenderUI(DarkFactory{}) // impossible to get a mismatched pair — the factory is the family
+}
+
+// Output:
+// dark button dark checkbox
 ```
 
 > [!warning] Tradeoffs
@@ -90,20 +230,55 @@ func RenderUI(f UIFactory) {
 > [!example] Layman
 > Ordering a custom sandwich one layer at a time, instead of being forced to list all 15 possible ingredients — most left blank — on one giant order form.
 
+**Trigger:** "too many optional constructor parameters"
 **When to use:** a constructor would otherwise need many optional parameters, most of which are only occasionally set.
 
+> [!tip] Identification trick
+> Count the optional parameters a constructor would need. 4 or more optional params, most left at defaults most of the time → Builder. 2-3 fields → a plain struct literal is simpler; don't reach for Builder yet.
+
+**Without the pattern:**
+
 ```go
-// BEFORE — telescoping constructor, unreadable and error-prone at the call site
+package main
+
+import (
+	"fmt"
+	"time"
+)
+
+type Server struct {
+	port     int
+	tls      bool
+	cert     string
+	timeout  time.Duration
+	maxConns int
+	logLevel string
+}
+
 func NewServerBad(port int, tls bool, cert string, timeoutSec int, maxConns int, logLevel string) *Server {
 	return &Server{port, tls, cert, time.Duration(timeoutSec) * time.Second, maxConns, logLevel}
 }
 
-srv := NewServerBad(8080, true, "cert.pem", 30, 100, "info")
-// what's 30? what's 100? order matters and is invisible at the call site
+func main() {
+	srv := NewServerBad(8080, true, "cert.pem", 30, 100, "info")
+	// what's 30? what's 100? order matters and is invisible at the call site
+	fmt.Printf("port=%d tls=%v timeout=%v\n", srv.port, srv.tls, srv.timeout)
+}
+
+// Output:
+// port=8080 tls=true timeout=30s
 ```
 
+**With Builder (Go's idiom: functional options):**
+
 ```go
-// AFTER — functional options, Go's idiomatic Builder
+package main
+
+import (
+	"fmt"
+	"time"
+)
+
 type Server struct {
 	port    int
 	tls     bool
@@ -113,8 +288,10 @@ type Server struct {
 
 type ServerOption func(*Server)
 
-func WithPort(p int) ServerOption       { return func(s *Server) { s.port = p } }
-func WithTLS(cert string) ServerOption  { return func(s *Server) { s.tls = true; s.cert = cert } }
+func WithPort(p int) ServerOption { return func(s *Server) { s.port = p } }
+func WithTLS(cert string) ServerOption {
+	return func(s *Server) { s.tls = true; s.cert = cert }
+}
 func WithTimeout(d time.Duration) ServerOption { return func(s *Server) { s.timeout = d } }
 
 func NewServer(opts ...ServerOption) *Server {
@@ -125,8 +302,14 @@ func NewServer(opts ...ServerOption) *Server {
 	return s
 }
 
-srv := NewServer(WithPort(8080), WithTLS("cert.pem"), WithTimeout(30*time.Second))
-// self-documenting at the call site, any subset of options, any order
+func main() {
+	srv := NewServer(WithPort(8080), WithTLS("cert.pem"), WithTimeout(30*time.Second))
+	// self-documenting at the call site, any subset of options, any order
+	fmt.Printf("port=%d tls=%v timeout=%v\n", srv.port, srv.tls, srv.timeout)
+}
+
+// Output:
+// port=8080 tls=true timeout=30s
 ```
 
 > [!warning] Tradeoffs
@@ -137,12 +320,28 @@ srv := NewServer(WithPort(8080), WithTLS("cert.pem"), WithTimeout(30*time.Second
 ## Singleton
 
 > [!example] Layman
-> A country's central bank — not "hard to duplicate," but genuinely *shouldn't* have more than one, since two would issue conflicting currency decisions.
+> A country's central bank — not "hard to make more of," but genuinely *shouldn't* have more than one, since two would issue conflicting currency decisions.
 
-**When to use:** exactly one instance must exist, globally accessible — a shared, stateless config or logger being the legitimate case.
+**Trigger:** "exactly one instance, shared everywhere, safe under concurrent access"
+**When to use:** a shared, stateless config or logger being the legitimate case.
+
+> [!tip] Identification trick
+> Ask: "would having *two* of these actually produce an incorrect result, not just waste memory?" If yes → Singleton. If it's just expensive to build and you already have one lying around to copy → that's Prototype, not Singleton.
+
+**Without the pattern:**
 
 ```go
-// BEFORE — global var, race condition on first concurrent access
+package main
+
+import (
+	"fmt"
+	"sync"
+)
+
+type Config struct{ Value string }
+
+func loadConfig() *Config { return &Config{Value: "loaded"} }
+
 var config *Config
 
 func GetConfigBad() *Config {
@@ -151,10 +350,41 @@ func GetConfigBad() *Config {
 	}
 	return config
 }
+
+func main() {
+	var wg sync.WaitGroup
+	for i := 0; i < 5; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_ = GetConfigBad() // run with `go run -race` to see the reported data race
+		}()
+	}
+	wg.Wait()
+	fmt.Println(GetConfigBad().Value)
+}
+
+// Output:
+// loaded
+//
+// (functionally correct here because the race window is tiny and loadConfig is cheap —
+// `go run -race` still flags a real, reportable data race on the "config" variable)
 ```
 
+**With Singleton (`sync.Once`):**
+
 ```go
-// AFTER — sync.Once guarantees exactly-once init, safe under concurrency
+package main
+
+import (
+	"fmt"
+	"sync"
+)
+
+type Config struct{ Value string }
+
+func loadConfig() *Config { return &Config{Value: "loaded"} }
+
 var (
 	config     *Config
 	configOnce sync.Once
@@ -166,6 +396,22 @@ func GetConfig() *Config {
 	})
 	return config
 }
+
+func main() {
+	var wg sync.WaitGroup
+	for i := 0; i < 5; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_ = GetConfig() // safe under `go run -race` — init happens exactly once, guaranteed
+		}()
+	}
+	wg.Wait()
+	fmt.Println(GetConfig().Value)
+}
+
+// Output:
+// loaded
 ```
 
 > [!warning] Tradeoffs — the controversial part, stated honestly
@@ -178,25 +424,61 @@ func GetConfig() *Config {
 > [!example] Layman
 > Photocopying a filled-out form instead of writing a blank one from memory each time, then correcting only the fields that differ.
 
+**Trigger:** "clone an existing, expensive-to-build object instead of rebuilding"
 **When to use:** building an object from scratch is expensive (heavy initialization, deep config), but a similar object already exists to copy from.
 
+> [!tip] Identification trick
+> Ask: "is building this from scratch measurably expensive, and do I already have a similar one sitting around to copy?" If yes → Prototype. If the concern is "there must never be more than one" rather than "building it is slow" → that's Singleton, not this.
+
+**Without the pattern:**
+
 ```go
-// BEFORE — every new similar object pays the full, expensive init cost again
+package main
+
+import "fmt"
+
 type Document struct {
 	Sections []string
 	Styles   map[string]string
 }
 
+func parseTemplate() []string        { return []string{"Header", "Body", "Footer"} } // pretend: expensive
+func loadStyles() map[string]string  { return map[string]string{"font": "Times"} }   // pretend: expensive
+
 func NewLegalTemplate() *Document {
 	return &Document{Sections: parseTemplate(), Styles: loadStyles()} // expensive: disk + parsing
 }
 
-doc1 := NewLegalTemplate() // expensive
-doc2 := NewLegalTemplate() // expensive AGAIN — nearly identical to doc1
+func main() {
+	doc1 := NewLegalTemplate() // expensive
+	doc2 := NewLegalTemplate() // expensive AGAIN — nearly identical to doc1
+	doc2.Sections[0] = "Custom Header"
+	fmt.Println(doc1.Sections[0], doc2.Sections[0])
+}
+
+// Output:
+// Header Custom Header
 ```
 
+**With Prototype:**
+
 ```go
-// AFTER — build the expensive template once, clone it cheaply thereafter
+package main
+
+import "fmt"
+
+type Document struct {
+	Sections []string
+	Styles   map[string]string
+}
+
+func parseTemplate() []string       { return []string{"Header", "Body", "Footer"} }
+func loadStyles() map[string]string { return map[string]string{"font": "Times"} }
+
+func NewLegalTemplate() *Document {
+	return &Document{Sections: parseTemplate(), Styles: loadStyles()}
+}
+
 func (d *Document) Clone() *Document {
 	stylesCopy := make(map[string]string, len(d.Styles))
 	for k, v := range d.Styles {
@@ -206,10 +488,16 @@ func (d *Document) Clone() *Document {
 	return &Document{Sections: sectionsCopy, Styles: stylesCopy}
 }
 
-template := NewLegalTemplate() // pay the expensive cost ONCE
-doc1 := template.Clone()       // cheap
-doc2 := template.Clone()       // cheap
-doc2.Sections[0] = "Custom clause" // only doc2 changes — template itself untouched
+func main() {
+	template := NewLegalTemplate()     // pay the expensive cost ONCE
+	doc1 := template.Clone()           // cheap
+	doc2 := template.Clone()           // cheap
+	doc2.Sections[0] = "Custom Header" // only doc2 changes — template itself untouched
+	fmt.Println(template.Sections[0], doc1.Sections[0], doc2.Sections[0])
+}
+
+// Output:
+// Header Header Custom Header
 ```
 
 > [!warning] Tradeoffs
@@ -224,11 +512,13 @@ doc2.Sections[0] = "Custom clause" // only doc2 changes — template itself unto
 
 ## Summary / Cheat Sheet
 
-- **Factory Method:** full chapter — see [[LLD/01 - Design a Parking Lot/Design a Parking Lot|Parking Lot]].
-- **Abstract Factory:** guarantees a *matched family* of related objects — the fix for accidentally mixing themes/families.
-- **Builder:** step-by-step construction for many optional parameters — Go's idiom is functional options.
-- **Singleton:** exactly one instance, made safe under concurrency via `sync.Once` — controversial; weigh testability before reaching for it.
-- **Prototype:** clone an existing, already-built object instead of paying expensive init again — must deep-copy mutable fields.
+| Pattern | Trick | Complete code above |
+|---|---|---|
+| Factory Method | One product, caller doesn't pick the concrete type | ✅ |
+| Abstract Factory | A *matched family* of 2+ objects that must never mismatch | ✅ |
+| Builder | 4+ optional constructor params → functional options in Go | ✅ |
+| Singleton | Two instances would be *incorrect*, not just wasteful → `sync.Once` | ✅ |
+| Prototype | Expensive to build from scratch, cheap to clone an existing one | ✅ |
 
 ---
-*Related: [[CS Fundamentals/00 - Learning Path|CS Fundamentals Learning Path]] · [[CS Fundamentals/10 - Design Principles/Design Patterns Cheat Sheet|Design Patterns Cheat Sheet]] · [[CS Fundamentals/10 - Design Principles/Structural Design Patterns - Full Code Deep Dive|Structural Design Patterns]] · [[CS Fundamentals/10 - Design Principles/Behavioral Design Patterns - Full Code Deep Dive|Behavioral Design Patterns]] · [[LLD/01 - Design a Parking Lot/Design a Parking Lot|Design a Parking Lot]]*
+*Related: [[CS Fundamentals/00 - Learning Path|CS Fundamentals Learning Path]] · [[CS Fundamentals/10 - Design Principles/02 - Design Patterns Cheat Sheet|Design Patterns Cheat Sheet]] · [[CS Fundamentals/10 - Design Principles/04 - Structural Design Patterns - Full Code Deep Dive|Structural Design Patterns]] · [[CS Fundamentals/10 - Design Principles/05 - Behavioral Design Patterns - Full Code Deep Dive|Behavioral Design Patterns]] · [[LLD/01 - Design a Parking Lot/Design a Parking Lot|Design a Parking Lot]]*
