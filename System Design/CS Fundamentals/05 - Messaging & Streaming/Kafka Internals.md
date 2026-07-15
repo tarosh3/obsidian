@@ -147,9 +147,31 @@ Once located, the broker sends the raw bytes to the consumer using the **`sendfi
 - **Small-scale task queues.** Running (or paying for a managed) Kafka cluster is real operational overhead — for "process background jobs at a few hundred/sec," SQS or a Redis-backed queue is simpler and cheaper to operate.
 - **Very large individual payloads.** Kafka is tuned for high-volume small/medium messages; large blobs (video files, big documents) are better stored in object storage (S3) with just a *reference* published to Kafka.
 
+## 8. Scaling: 1 message/sec to millions/sec
+
+```mermaid
+flowchart TD
+    A["Low volume<br/>1 partition may be enough,<br/>replication factor 3 for durability"] --> B["Growing volume<br/>add partitions for parallelism,<br/>consumer group scales with them"]
+    B --> C["Millions/sec<br/>partition count sized to target<br/>throughput / per-partition ceiling,<br/>batching + compression become essential, not optional"]
+    C --> D["Multi-datacenter scale<br/>MirrorMaker/Cluster Linking<br/>replicates topics ACROSS clusters,<br/>a different mechanism than intra-cluster ISR replication"]
+```
+
+At low volume, a single partition per topic with a healthy replication factor is genuinely sufficient — resist adding partitions before throughput demands it, since more partitions means more per-broker overhead (Section on capacity planning in [[CS Fundamentals/05 - Messaging & Streaming/Kafka Ecosystem and Production Patterns|Kafka Ecosystem & Production Patterns]]). As throughput grows, partition count becomes the direct parallelism lever — both for producer write throughput and for how many consumers in a group can process concurrently. At true high-volume scale, client-side batching and compression (Section 6) stop being minor optimizations and become load-bearing for hitting target throughput at all. At multi-datacenter scale, **cross-cluster replication** (MirrorMaker 2, or Confluent's Cluster Linking) becomes necessary — a genuinely different mechanism from the intra-cluster ISR replication covered in Section 2, since it's replicating entire topics between independently-operated clusters, not just providing failover within one.
+
+## 9. Failure scenarios
+
+> [!bug] What actually happens, precisely
+> - **A broker crashes:** the controller detects it (missed heartbeats) and triggers leader election for every partition that broker led, promoting an ISR member — covered in Section 2, but worth restating as the direct answer to "what happens when a broker dies." Partitions where that broker was only a follower are unaffected.
+> - **The controller itself crashes:** in KRaft mode, the small set of controller nodes use Raft consensus among themselves (per [[CS Fundamentals/06 - Distributed Systems/Consensus (Raft & Paxos)|the Consensus chapter]]) to elect a new controller — the cluster's own coordination doesn't have a single point of failure, by the same mechanism Kubernetes' etcd uses for its own control plane.
+> - **A consumer crashes mid-processing:** depending on offset-commit configuration, messages processed but not yet committed will be re-delivered to another consumer in the group after rebalancing — this is exactly why consumers need to be [[Glossary/Idempotency|idempotent]], since "processed but crashed before committing" is a real, expected occurrence, not a rare edge case.
+> - **An entire data center hosting the cluster goes down:** intra-cluster replication (ISR) doesn't help here, since all replicas were in that same data center — this is specifically what cross-cluster replication (Section 8) exists to protect against, a genuinely different failure domain than a single broker or controller dying.
+
 ---
 
 ## 🎯 Interview follow-up Q&A
+
+> [!info] Leveled by seniority
+> **Beginner:** "What is Kafka used for?" — high-throughput, durable event streaming with multiple independent consumers and replay capability. **Intermediate:** "Why is Kafka fast despite writing every message to disk?" — Section 6's four mechanics: sequential I/O, page cache, zero-copy, batching/compression. **Senior:** "A consumer group's lag is climbing steadily — walk through your diagnostic approach." — the Production Experience section below: check consumer-side processing time/GC first, then broker-side health, rather than assuming Kafka itself is the bottleneck. **Staff:** "Design the partitioning and replication strategy for a topic that must survive a full data-center outage." — expects both intra-cluster ISR replication AND cross-cluster replication (Section 8) named explicitly, since they protect against genuinely different failure domains. **Architect:** "How would you decide between one large shared Kafka cluster and several smaller topic-specific clusters for a large organization?" — expects a real tradeoff discussion: shared cluster means lower operational overhead but noisy-neighbor risk (one team's hot topic affecting another's), separate clusters mean better isolation at the cost of more clusters to operate — the same "shared vs. dedicated infrastructure" tension that recurs throughout distributed systems design, not a Kafka-specific one.
 
 > [!quote]- Q: "Why is Kafka fast despite writing every message to disk?"
 > **A:** Sequential disk I/O (not random), reliance on the OS page cache instead of a separate application-level cache, zero-copy reads via `sendfile`, and client-side batching/compression.
@@ -198,4 +220,4 @@ Once located, the broker sends the raw bytes to the consumer using the **`sendfi
 > Tiered storage (moving older segments to cheap object storage while keeping recent data on fast local disks) is the biggest lever for high-retention topics. Right-sizing partition count matters too — more partitions means more open file handles and more per-partition replication overhead per broker, so "just add more partitions" isn't free.
 
 ---
-*Related: [[Glossary/Idempotency|Idempotency]] · [[00 - Start Here/How This Handbook Works|Book Map]]*
+*Related: [[Glossary/Idempotency|Idempotency]] · [[00 - Start Here/How This Handbook Works|Book Map]] · [[CS Fundamentals/05 - Messaging & Streaming/Kafka Ecosystem and Production Patterns|Kafka Ecosystem & Production Patterns]] · [[CS Fundamentals/06 - Distributed Systems/Consensus (Raft & Paxos)|Consensus (Raft & Paxos)]]*

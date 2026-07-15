@@ -69,9 +69,42 @@ Systems where slightly stale data is tolerable but downtime is not — social fe
 > [!bug] A common mistake worth naming
 > Assuming "NoSQL always means AP" or "SQL always means CP" is false — it's determined by each specific system's design and configuration, not its category label. Google Spanner is relational-flavored **and** globally strongly-consistent (via TrueTime); MongoDB, often bucketed as "NoSQL," actually defaults to **CP-leaning** behavior.
 
+## 7. Scaling: how the CAP/PACELC tension changes from 1 user to 1 billion
+
+```mermaid
+flowchart TD
+    A["Single node<br/>NO CAP tradeoff exists —<br/>nothing is distributed yet"] --> B["Few replicas, ONE datacenter<br/>partitions are rare;<br/>CP/AP choice starts to matter"]
+    B --> C["Multi-region, 100M-1B users<br/>cross-region partitions are<br/>an EXPECTED, frequent occurrence"]
+    C --> D["At this scale, PACELC's<br/>'Else' branch (latency vs consistency)<br/>dominates day-to-day, more than<br/>the rarer partition case"]
+```
+
+At small scale, on a single node, there's no CAP tradeoff at all — nothing is distributed, so nothing can partition. As replication is introduced within one data center, partitions become theoretically possible but genuinely rare (a rack-level network blip), so the CP/AP choice matters but doesn't dominate daily operation. At true global, multi-region scale, cross-region network links are meaningfully less reliable than intra-datacenter ones — partitions stop being a rare edge case and become an expected, recurring operational reality. At the same time, PACELC's "Else" branch — the latency-vs-consistency tradeoff paid on **every single request during normal operation** — becomes the more consequential day-to-day concern in aggregate, simply because it's paid continuously, while partitions, even at this scale, remain comparatively rare incidents.
+
+## 8. Failure scenarios
+
+> [!bug] Beyond the clean, textbook 2-way split
+> - **Single node failure within a replica set (not a full partition):** handled by ordinary leader-election/replica-promotion — doesn't require invoking the full CP/AP decision, since the remaining nodes can still reach quorum among themselves.
+> - **A genuine network partition splitting a cluster in two:** the CP/AP decision from Section 4 applies directly — minority side refuses (CP) or continues serving against a stale view (AP).
+> - **A "gray failure" / partial partition:** some nodes can reach each other, others can't, in an inconsistent pattern — a genuinely harder, more realistic production scenario than the clean two-region split most textbook diagrams show, since different nodes may disagree about who's even reachable, complicating quorum calculations in ways a simple "side A vs. side B" model doesn't capture.
+
+## 9. Monitoring
+
+> [!info] What actually signals a CAP/PACELC tradeoff being paid in production
+> **Replication lag** — the practical, measurable proxy for "how far into eventual consistency is this system right now," directly relevant to any AP or PACELC-EL system. **Quorum health** (number of currently-reachable replicas relative to what's required) — the leading indicator that a CP system is about to start refusing requests. **Cross-region request latency** — the direct, measurable cost of PACELC's "Else" branch during normal operation, worth tracking as its own metric rather than only noticing it via user complaints.
+
+## 10. Common mistakes
+
+> [!warning] Recurring, real imprecisions
+> 1. **Assuming "NoSQL means AP" or "SQL means CP"** — false; it's determined by each system's specific design, not its category label (already covered in Section 6's bug callout — Spanner and MongoDB both break this assumption in opposite directions).
+> 2. **Treating a system's CAP classification as a fixed, permanent label** — Cassandra is tunable *per query* via consistency levels; describing it with one fixed classification misses this entirely.
+> 3. **Only ever discussing the partition case** — forgetting PACELC means missing that the latency-vs-consistency tradeoff is paid constantly during normal operation, not just during the comparatively rare moments a partition is actually happening.
+
 ---
 
 ## 🎯 Interview follow-up Q&A
+
+> [!info] Leveled by seniority
+> **Beginner:** "What does CAP theorem stand for?" — Consistency, Availability, Partition tolerance; you can't have all three simultaneously during a partition. **Intermediate:** "Why is partition tolerance not really optional?" — Section 3's answer, real networks partition eventually. **Senior:** "Classify a system you've worked with on the full PACELC spectrum, not just CAP." — expects the candidate to reason about BOTH the partition behavior and the normal-operation latency/consistency choice, not just one. **Staff:** "Design a data layer for a global application where 90% of reads can tolerate staleness but 10% (payment status) cannot — how do you avoid a single global CAP classification for the whole system?" — expects a hybrid answer: eventually-consistent reads for the tolerant majority, a strongly-consistent path specifically for the payment-status subset, mirroring Section 6's "hybrid" guidance concretely. **Architect:** "How would you evolve a single-region CP system into a multi-region deployment without silently changing its consistency guarantees underneath existing callers?" — expects discussion of making the tradeoff explicit and versioned/communicated to consumers, not just flipping a config flag and hoping downstream assumptions still hold.
 
 > [!quote]- "Explain CAP theorem — with a real example, not just the triangle."
 > [Use the banking/two-data-center example from Section 4 — a concrete scenario is what separates a memorized answer from a real one.]

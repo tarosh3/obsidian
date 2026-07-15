@@ -72,11 +72,45 @@ Every index adds **write overhead** — every `INSERT`/`UPDATE`/`DELETE` must al
 
 ## 9. The alternative worth naming: hash indexes, and LSM Trees as a different family entirely
 
-A **hash index** gives `O(1)` average lookup but supports **no range queries and no ordering** — a genuine tradeoff, not strictly worse. And B+ Trees aren't the only major indexing structure family: **LSM Trees** (used by Cassandra, RocksDB, LevelDB) optimize for **write-heavy** workloads via append-only writes and background compaction, trading some read cost for dramatically cheaper writes — the direct "when B+ Trees are the wrong choice" answer, and worth a dedicated future chapter of its own.
+A **hash index** gives `O(1)` average lookup but supports **no range queries and no ordering** — a genuine tradeoff, not strictly worse. And B+ Trees aren't the only major indexing structure family: **LSM Trees** (used by Cassandra, RocksDB, LevelDB) optimize for **write-heavy** workloads via append-only writes and background compaction, trading some read cost for dramatically cheaper writes — the direct "when B+ Trees are the wrong choice" answer, covered in full in [[CS Fundamentals/03 - Databases/Storage Engines - B-Tree vs LSM-Tree|Storage Engines: B-Tree vs. LSM-Tree]].
+
+## 10. Scaling: 1 user to 1 billion rows
+
+```mermaid
+flowchart TD
+    A["Thousands of rows<br/>tree fits in ~1-2 levels,<br/>index barely matters"] --> B["Millions of rows<br/>tree is 3-4 levels —<br/>the 'index vs full scan' gap<br/>becomes dramatic"]
+    B --> C["Billions of rows,<br/>single table<br/>tree stays shallow (still ~5-6 levels)<br/>but INDEX SIZE ITSELF becomes<br/>a real memory/cache concern"]
+    C --> D["Beyond one machine's<br/>disk/memory capacity<br/>sharding required —<br/>see Sharding & Partitioning"]
+```
+
+The genuinely remarkable property of a B+ Tree is that its height grows **logarithmically** — going from a million to a billion rows adds only one or two more levels, not a thousand times more disk reads. The real scaling pressure at extreme row counts isn't tree height — it's whether the **index itself** (not just the data) still fits comfortably in memory/page cache; a huge composite index on a huge table can itself become large enough that traversing it stops being reliably cache-resident, reintroducing real disk I/O per lookup even though the tree is still only a few levels deep. Past a single machine's realistic capacity, [[CS Fundamentals/06 - Distributed Systems/Sharding & Partitioning|sharding]] becomes necessary — at which point each shard maintains its own, smaller B+ Tree rather than one impossibly large one.
+
+## 11. Failure scenarios
+
+> [!bug] What happens when things go wrong
+> - **Crash mid-insert (during a node split):** relational databases protect index structures the same way they protect table data — via the [[CS Fundamentals/03 - Databases/Storage Engines - B-Tree vs LSM-Tree|write-ahead log]]; an incomplete split is recovered by replaying the WAL on restart, never left in a corrupted intermediate state.
+> - **Index and table data disagreeing (corruption):** a rare but real failure mode, usually from disk-level corruption or a bug — databases provide index-rebuild tooling specifically because this can happen, and detecting it usually surfaces as queries silently returning wrong/missing rows rather than an obvious crash, which is what makes it dangerous.
+> - **A composite index silently not being used:** not a crash, but a genuine "failure" from the application's perspective — the leftmost-prefix-rule mistake from Section 7 causes queries to silently fall back to a full scan, degrading performance without any error at all.
+
+## 12. Monitoring
+
+> [!info] What to watch
+> **Query plan usage** (`EXPLAIN ANALYZE`, already covered in [[CS Fundamentals/03 - Databases/SQL Query Execution Deep Dive|SQL Query Execution Deep Dive]]) — confirms whether a specific query is actually using the index you expect, catching leftmost-prefix mistakes directly. **Index size relative to available memory/page cache** — the practical signal for whether index lookups are still cache-resident or have started requiring real disk I/O. **Write latency on heavily-indexed tables** — a rising trend here is the direct, measurable cost of Section 8's "every index adds write overhead," worth tracking explicitly rather than assuming it's negligible.
+
+## 13. Common mistakes
+
+> [!warning] Real, recurring production errors
+> 1. **Assuming a composite index helps any query touching its columns, in any combination** — the leftmost-prefix rule (Section 7) means an index on `(a, b)` doesn't help a query filtering only on `b`.
+> 2. **Over-indexing a write-heavy table** — every additional index is real, ongoing write overhead (Section 8), not a free performance win.
+> 3. **Indexing a low-cardinality column expecting a speedup** — a boolean or few-distinct-value column often doesn't benefit, since the optimizer may correctly prefer a full scan anyway.
+> 4. **Not understanding the "bookmark lookup" cost of a non-clustered index** — a secondary index lookup that isn't a covering index pays an extra trip into the clustered index per row, a real, easy-to-miss cost when comparing two query plans.
 
 ---
 
 ## 🎯 Interview follow-up Q&A
+
+> [!info] Leveled by seniority
+> **Beginner:** "What is a database index?" — a separate structure trading write overhead for faster lookups than a full table scan. **Intermediate:** "Why B+ Trees specifically, not binary trees?" — Section 2, minimizing disk-seek-driving tree height via high branching factor. **Senior:** "Diagnose a query that should be using an index but is running a full scan instead." — expects the leftmost-prefix-rule check (Section 7) and `EXPLAIN ANALYZE` usage as the actual diagnostic tool, not a guess. **Staff:** "A table's index has grown large enough that lookups have gotten slower over the past year despite the tree height barely changing — why, and what would you do?" — expects the Section 10 answer: the index itself no longer fits comfortably in page cache, and the fix is likely partitioning/sharding rather than "add a faster disk." **Architect:** "How would you decide whether a workload needs a B+ Tree-based engine or an LSM-Tree-based one?" — expects a real tradeoff walk-through referencing [[CS Fundamentals/03 - Databases/Storage Engines - B-Tree vs LSM-Tree|Storage Engines]]: read-heavy/balanced workloads favor B+ Tree engines, write-heavy/high-ingest workloads favor LSM-Tree engines, not a reflexive "B+ Tree is standard so use it."
 
 > [!quote]- "Why do databases use B+ Trees instead of a plain balanced binary search tree?"
 > Minimizing tree *height* matters far more than just balance, because historically each level traversed could mean a disk seek. B+ Trees achieve a very high branching factor per node (hundreds of keys), keeping the tree only 3-4 levels deep even for millions of rows — a binary tree's height would be dramatically taller for the same data volume.
@@ -94,4 +128,4 @@ A **hash index** gives `O(1)` average lookup but supports **no range queries and
 > No. The index is sorted primarily by `last_name`; without a `last_name` predicate, the database cannot binary-search into the structure using `first_name` alone — it would need a full index scan (or full table scan), not the efficient seek the index is meant to provide.
 
 ---
-*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[HLD/01 - Design TinyURL (URL Shortener)/Design TinyURL|Design TinyURL]] · [[Glossary/Consistent Hashing|Consistent Hashing]]*
+*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[HLD/01 - Design TinyURL (URL Shortener)/Design TinyURL|Design TinyURL]] · [[Glossary/Consistent Hashing|Consistent Hashing]] · [[CS Fundamentals/03 - Databases/Storage Engines - B-Tree vs LSM-Tree|Storage Engines: B-Tree vs. LSM-Tree]] · [[CS Fundamentals/03 - Databases/SQL Query Execution Deep Dive|SQL Query Execution Deep Dive]]*

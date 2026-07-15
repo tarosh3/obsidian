@@ -67,9 +67,47 @@ The original **Amazon Dynamo** paper introduced this technique; **Cassandra** us
 
 A **small, static cluster that never scales** doesn't need this — the entire benefit of consistent hashing is handling **dynamic membership changes** gracefully; if `N` never changes, plain modulo hashing's catastrophic-remap cost never actually triggers, and the simpler approach is fine.
 
+## 6. Replication via the ring — not just partitioning
+
+> [!success] The mechanism that gives Dynamo/Cassandra BOTH partitioning and replication from one structure
+> A key isn't just owned by the single node it hashes closest to clockwise — it's replicated to the next **R** *distinct physical* nodes walking clockwise from that point (skipping virtual nodes belonging to a server already in the replica set). This means the exact same ring mechanism that solves partitioning also solves replication placement, with zero additional coordination structure needed — worth naming explicitly, since it's easy to describe consistent hashing as purely a partitioning technique and miss that real systems get replication from it almost for free.
+
+## 7. Scaling: 1 user to 1 billion
+
+```mermaid
+flowchart TD
+    A["Few servers, static<br/>plain modulo is fine —<br/>no scaling events to protect against"] --> B["10s of servers,<br/>occasional scaling<br/>consistent hashing avoids<br/>cascading cache invalidation"]
+    B --> C["1000s of nodes,<br/>frequent auto-scaling<br/>virtual nodes become ESSENTIAL,<br/>not optional, for even distribution"]
+    C --> D["Global scale<br/>often one ring PER REGION —<br/>cross-region rebalancing has<br/>different cost characteristics"]
+```
+
+At small scale with a static server count, plain modulo hashing's catastrophic-remap cost simply never triggers, since nothing ever changes `N` — the simpler approach is genuinely fine. As scaling events become routine, consistent hashing's bounded-remap property starts mattering in practice, not just in theory. At very large scale (thousands of nodes with frequent auto-scaling), virtual nodes stop being a nice-to-have refinement and become load-bearing — without them, uneven distribution at that many topology changes per day would be a constant operational irritant. At true global scale, systems often maintain **separate rings per region** rather than one global ring, since cross-region data movement has fundamentally different (higher) cost characteristics than intra-region rebalancing.
+
+## 8. Failure scenarios
+
+> [!bug] What actually happens, and one genuinely elegant property
+> - **A physical server crashes:** its virtual nodes' key ranges are automatically taken over by their clockwise neighbors — the ring mechanism itself handles this with **no special crash-detection logic** beyond ordinary ring-membership-change handling, since a crash and a graceful removal look structurally identical to the ring. This uniformity is a genuinely elegant property worth naming explicitly.
+> - **Network partition splitting nodes' view of the ring:** different nodes may temporarily disagree about current ring membership — resolved via [[Glossary/Gossip Protocol|gossip protocol]] propagating membership changes until the cluster converges on a consistent view.
+> - **A node rejoining after being down:** it needs to catch up on writes that happened to its key ranges while it was absent (typically via read-repair or hinted handoff mechanisms, covered in depth in [[CS Fundamentals/03 - Databases/Cassandra Internals|Cassandra Internals]]) before it can be fully trusted for reads again.
+
+## 9. Monitoring
+
+> [!info] What to watch
+> **Key distribution skew** across nodes — confirms virtual nodes are actually achieving even distribution in practice, not just in theory. **Rebalancing data-movement volume** during scaling events — validates the bounded-remap property is holding (a scaling event moving far more data than the expected `~1/(N+1)` fraction signals a configuration problem, like too few virtual nodes). **Ring convergence time** after a membership change — how long until all nodes agree on the current ring state, directly tied to gossip protocol propagation speed.
+
+## 10. Common mistakes
+
+> [!warning] Real, recurring errors
+> 1. **Too few virtual nodes** — poor load distribution, defeating the main reason virtual nodes exist. **Too many** — ring lookup and membership-change propagation overhead grows for diminishing distribution benefit past a reasonable point (100-200 is the commonly cited sweet spot for a reason).
+> 2. **Forgetting replication when using consistent hashing for a genuine data store** — the ring alone gives partitioning, not fault tolerance; without explicitly replicating to the next R clockwise nodes (Section 6), a single node failure means genuine data loss for its key range, not just a rebalance.
+> 3. **Conflating consistent hashing with Redis Cluster's hash-slot approach** — a related but genuinely different mechanism, covered in Section 4's warning callout.
+
 ---
 
 ## 🎯 Interview follow-up Q&A
+
+> [!info] Leveled by seniority
+> **Beginner:** "What problem does consistent hashing solve?" — avoiding the catastrophic remap that plain `hash(key) % N` causes when `N` changes. **Intermediate:** "Why do virtual nodes matter?" — Section 3, even distribution and smoother rebalancing. **Senior:** "How does consistent hashing give you replication, not just partitioning?" — Section 6, replicate to the next R distinct physical nodes clockwise. **Staff:** "Design a globally-distributed key-value store's partitioning scheme — would you use one ring or many?" — expects the Section 7 answer: per-region rings, with cross-region replication/routing handled as a separate concern layered on top, not one unified global ring. **Architect:** "A production cluster using consistent hashing is showing uneven load despite virtual nodes — how do you diagnose it?" — expects a systematic approach: check actual key distribution metrics first (is it a hashing-distribution problem or a genuine hot-key problem no amount of rebalancing fixes, per [[CS Fundamentals/06 - Distributed Systems/Sharding & Partitioning|Sharding & Partitioning]]'s hot-key discussion), rather than assuming more virtual nodes is automatically the fix.
 
 > [!quote]- "Why does adding one server under naive modulo hashing remap almost everything?"
 > Because the modulus itself changes — `hash(key) % N` becomes `hash(key) % (N+1)` for every key simultaneously, and there's no relationship between a key's old assigned server and its new one under a different modulus. Roughly `N/(N+1)` of all keys end up somewhere different.
