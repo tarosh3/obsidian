@@ -76,9 +76,42 @@ Closing a connection is (typically) a four-message exchange: `FIN → ACK → FI
 
 TCP's reliability/ordering guarantees come at a real cost: the handshake before any data flows, retransmission waits on loss, and **head-of-line blocking** — a single lost packet blocks *all* subsequently-arrived data from being delivered to the application until the gap is filled, even if later bytes already arrived intact. UDP has none of TCP's guarantees or overhead — the right choice when a late packet is *worse* than a dropped one (live video/audio, gaming) rather than needing every byte to eventually arrive correctly.
 
+## 8. Scaling: 1 connection to millions
+
+```mermaid
+flowchart TD
+    A["1 connection<br/>trivial"] --> B["Many concurrent connections<br/>on one server<br/>file descriptor limits,<br/>TIME_WAIT exhaustion risk"]
+    B --> C["Massive scale<br/>epoll/io_uring required —<br/>see I/O Models chapter"]
+    C --> D["Global, high-latency links<br/>standard TCP throughput bound by<br/>RTT x window size — window<br/>scaling needed for 'long fat pipes'"]
+```
+
+At high connection counts on one machine, [[CS Fundamentals/01 - Operating Systems/I-O Models - Blocking, Non-Blocking, and Async|the I/O Models chapter's]] `epoll`-based event loop is what makes holding tens of thousands of TCP connections open on a handful of threads actually feasible — this chapter's mechanics (handshake, windows, retransmission) apply per-connection regardless of how many are held, but *how* a server holds many of them at once is that chapter's concern, not this one's. Over high-latency, high-bandwidth links (cross-region, satellite), a well-known real constraint appears: a connection's maximum throughput is bounded by `window size / RTT` — a large window is useless if RTT is high enough that acknowledgments trickle back slowly, the "long fat pipe" problem, addressed via TCP window scaling (negotiated during the handshake) to use a larger effective window than the original protocol's default allows.
+
+## 9. Failure scenarios
+
+> [!bug] What actually happens
+> - **Packet loss mid-stream:** retransmission via timeout, or **fast retransmit** (Section 3) when three duplicate ACKs signal a specific loss — the faster path in practice.
+> - **A peer crashes without sending `FIN`:** TCP alone doesn't notice for a long time without **keepalive** enabled — the connection can sit in a "believed open" state on the surviving side indefinitely unless the application layer sends its own heartbeats or TCP keepalive is explicitly configured.
+> - **Sustained network congestion:** repeated loss triggers repeated congestion-window collapses — the sawtooth pattern (Section 4) becomes a genuine, sustained throughput ceiling rather than a brief blip.
+
+## 10. Monitoring
+
+> [!info] What to watch
+> **Retransmission rate** — the direct, measurable signal of packet loss/network health on a given path. **Connection count and TIME_WAIT count** — the leading indicator before local port exhaustion (Section 5) becomes an actual incident. **RTT distribution** — rising values or growing variance signal network path degradation before it shows up as application-level timeouts.
+
+## 11. Common mistakes
+
+> [!warning] Real, recurring errors
+> 1. **Not setting `TCP_NODELAY` for latency-sensitive RPC traffic** — Section 6's Nagle's-algorithm interaction causes a real, measurable ~40ms stall that's easy to misdiagnose as "the network is just slow."
+> 2. **Not pooling/reusing connections** — Section 5's TIME_WAIT exhaustion is a direct, common consequence of creating a fresh short-lived connection per request instead of reusing one.
+> 3. **Assuming TCP alone detects a dead peer** — without keepalive configured (at the TCP or application layer), a connection to a crashed peer can appear open far longer than expected.
+
 ---
 
 ## 🎯 Interview follow-up Q&A
+
+> [!info] Leveled by seniority
+> **Beginner:** "What does TCP add on top of raw IP?" — reliability, ordering, flow control, congestion control (Section 1). **Intermediate:** "Explain flow control vs. congestion control." — Section 4's precise distinction. **Senior:** "A service making many short-lived outbound calls to an external API is intermittently failing with 'cannot assign requested address' — diagnose it." — expects recognizing local port exhaustion from TIME_WAIT accumulation (Section 5) and connection pooling as the fix, not a network-layer red herring. **Staff:** "Design connection-handling for a service expecting to hold hundreds of thousands of concurrent long-lived connections (e.g. WebSockets)." — expects the epoll/event-loop answer from the I/O Models chapter, explicitly connected to per-connection TCP mechanics staying the same regardless of count. **Architect:** "How does TCP's behavior need to be tuned differently for a service primarily serving users across intercontinental links vs. one serving users in a single data center?" — expects window scaling and the "long fat pipe" reasoning from Section 8, not a generic "just add more bandwidth" answer.
 
 > [!quote]- "Why does TCP use a 3-way handshake instead of 2 messages?"
 > Both sides need to independently confirm "I can send" and "I've received your confirmation that you can send" before exchanging real data — a 2-way exchange leaves the initiator's confirmation-of-confirmation unverified.

@@ -41,9 +41,42 @@ For content that genuinely can't be versioned (a live API response, personalized
 
 Modern CDNs (Cloudflare Workers, Lambda@Edge) run **actual application code** at edge locations, not just cached bytes — enabling things like A/B test routing, auth checks, or request rewriting to happen at the edge, closer to the user, before the request ever reaches origin infrastructure. Worth naming as the direction CDNs have moved beyond pure static-asset caching, without needing deep implementation detail for an interview.
 
+## Scaling: 1 user to viral, global traffic
+
+```mermaid
+flowchart TD
+    A["1 user<br/>CDN irrelevant"] --> B["Regional traffic<br/>CDN reduces latency<br/>meaningfully"]
+    B --> C["Global traffic<br/>CDN essential —<br/>edge cache hit rate becomes<br/>a first-class metric"]
+    C --> D["Viral content<br/>a single piece of content can<br/>concentrate huge load on SPECIFIC<br/>edge nodes — a hot-key problem<br/>at the CDN layer"]
+```
+
+At the largest scale, the interesting failure mode isn't aggregate traffic volume — it's a single piece of content going viral and concentrating disproportionate load on whichever specific edge nodes are geographically closest to where that traffic is coming from, structurally the same hot-key problem already covered generally in [[CS Fundamentals/06 - Distributed Systems/Sharding & Partitioning|Sharding & Partitioning]], just showing up at the CDN edge-caching layer instead of a database shard.
+
+## Failure scenarios
+
+> [!bug] What actually happens
+> - **An edge node goes down:** anycast naturally reroutes to the next-nearest advertising node — no application-level failover logic needed, the same mechanism already covered.
+> - **Origin becomes unreachable during a pull-CDN cache miss:** many CDN configurations serve **stale cached content past its TTL as a deliberate fallback** rather than failing the request outright — a real, named resilience pattern ("serve stale on origin failure") worth knowing by name.
+> - **A cache-poisoning or invalidation bug:** genuinely wrong content gets served from an edge until TTL expires or a fix propagates — a real, hard-to-quickly-remediate incident precisely because cache invalidation (Section "The hard problem") is inherently slow by design.
+
+## Monitoring
+
+> [!info] What to watch
+> **Cache hit ratio** — the single most important CDN health metric; a decline directly means more origin load and higher latency for affected requests. **Origin pull rate** — a spike signals either a falling cache-hit-rate or an active purge event, worth distinguishing which. **Per-edge latency** — confirms anycast routing is actually delivering users to a genuinely nearby edge, not just a technically-reachable one.
+
+## Common mistakes
+
+> [!warning] Real, recurring errors
+> 1. **Not versioning cacheable URLs** — the "hard problem" section's core fix; without it, every content change becomes a slow, unreliable purge operation.
+> 2. **Setting TTLs too long for unpredictably-changing content** — trades staleness risk for cache efficiency without the versioned-URL escape hatch to make that tradeoff safe.
+> 3. **Assuming CDN caching solves latency for genuinely dynamic, personalized content** — a CDN can't cache what's different for every single user; edge compute (Section "Edge compute") can help with some dynamic logic, but it isn't the same as content caching.
+
 ---
 
 ## Interview Q&A
+
+> [!info] Leveled by seniority
+> **Beginner:** "What problem does a CDN solve?" — reduces latency by serving content from locations physically close to users instead of one origin. **Intermediate:** "Why is CDN cache invalidation hard, and what's the real fix?" — the "hard problem" section, versioned URLs sidestepping invalidation entirely. **Senior:** "A specific region is experiencing high latency despite the CDN being globally deployed — diagnose it." — expects checking whether anycast is actually routing to a genuinely nearby edge (a routing/BGP issue) vs. a low cache-hit-rate at that specific edge (a caching-configuration issue) as two genuinely different root causes. **Staff:** "Design a caching strategy for a platform with both static assets and frequently-changing personalized content." — expects a tiered answer: versioned URLs + long TTLs for static assets, short-TTL or no-CDN-caching-at-all for personalized content, not one uniform policy. **Architect:** "A piece of content just went viral and a specific set of edge nodes are overloaded — what's your response, both immediate and structural?" — expects recognizing this as a hot-key problem at the CDN layer (Section "Scaling"), with immediate mitigation (additional edge capacity, request coalescing at the hot edges) and a structural discussion of whether push-CDN pre-distribution could have helped for genuinely predictable high-demand content.
 
 > [!question]- Why not just purge the CDN cache immediately whenever content changes?
 > Purges must propagate to every edge location that might hold a copy, which is slow and not instantaneously reliable across a globally distributed fleet — some edges can be temporarily unreachable or slow to receive the purge. Versioned URLs sidestep the problem entirely: there's nothing to purge, since the old URL is simply never referenced again and ages out naturally.

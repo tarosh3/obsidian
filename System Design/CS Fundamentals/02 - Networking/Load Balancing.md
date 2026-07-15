@@ -61,9 +61,43 @@ graph TD
     LB2 --> S2
 ```
 
+## Scaling: 1 backend to a global fleet
+
+```mermaid
+flowchart TD
+    A["1 backend<br/>no LB needed"] --> B["Multiple backends<br/>basic round robin"]
+    B --> C["Heterogeneous backends<br/>weighted round robin<br/>or least-connections"]
+    C --> D["Massive scale, stateful backends<br/>consistent-hash stickiness essential,<br/>OR push toward stateless design"]
+    D --> E["Global scale<br/>geo-based routing to nearest<br/>regional cluster, THEN<br/>algorithmic LB within it"]
+```
+
+At global scale, load balancing becomes two layers, not one: a geographic routing decision (which region/cluster should handle this user, typically via anycast or geo-DNS, per [[CS Fundamentals/02 - Networking/CDN Internals|CDN Internals]] and [[CS Fundamentals/02 - Networking/HTTP Evolution & DNS Resolution|HTTP Evolution & DNS Resolution]]) happens *before* any of this chapter's algorithms even apply — those algorithms then operate *within* whichever regional cluster the user was routed to.
+
+## Failure scenarios
+
+> [!bug] What actually happens
+> - **A backend fails a health check:** removed from rotation automatically — the direct payoff of active health checking, no manual intervention needed.
+> - **The load balancer itself fails:** covered above — multiple LB instances behind DNS round-robin/anycast prevent this from being a full outage.
+> - **A health check is too shallow:** the bug callout above, made concrete — a backend whose process is alive but whose actual dependency (database, downstream service) is down keeps receiving traffic it can't correctly serve, since a naive `200 OK` health check never catches this.
+
+## Monitoring
+
+> [!info] What to watch
+> **Per-backend request distribution** — the direct signal for detecting skew, whether from a bad algorithm choice or an unexpectedly hot backend. **Health-check failure rate** — a rising trend across many backends simultaneously often points to a shared downstream dependency issue, not independent backend failures. **LB-level latency/error rate** — since every request passes through it, the LB's own overhead is directly additive to every request's total latency.
+
+## Common mistakes
+
+> [!warning] Real, recurring errors
+> 1. **Shallow health checks** — the bug callout above; verify the backend's actual ability to serve, not just process liveness.
+> 2. **Using session-sticky routing when state could be externalized instead** — unnecessarily couples clients to specific backends when moving session state to a shared store (Redis) would let any algorithm work, including simpler ones.
+> 3. **Running a single LB instance with no redundancy** — the exact SPOF the "load balancer itself is a single point of failure" section above warns against.
+
 ---
 
 ## Interview Q&A
+
+> [!info] Leveled by seniority
+> **Beginner:** "What's the difference between L4 and L7 load balancing?" — Section 2's table: transport-layer speed vs. application-layer content awareness. **Intermediate:** "When would you use least-connections over round robin?" — when request costs vary meaningfully; least-connections adapts, round robin doesn't. **Senior:** "One backend in a fleet is receiving 3x the traffic of the others despite round-robin configuration — diagnose it." — expects checking for session stickiness inadvertently concentrating traffic, or a health-check/registration bug causing uneven backend counts, not assuming the algorithm itself is broken. **Staff:** "Design load balancing for a service with both stateless HTTP APIs and stateful WebSocket connections behind the same fleet." — expects recognizing these need different treatment: stateless traffic can use any algorithm freely, WebSocket connections need stickiness (IP hash/consistent hash) for their connection's lifetime. **Architect:** "How would you design load balancing for a globally-distributed service where user session data must stay in the user's home region?" — expects the two-layer answer from Section "Scaling": geographic routing first (keeping users in their home region), algorithmic load balancing within that region second — not one flat global algorithm.
 
 > [!question]- When would you choose IP hash over least-connections?
 > Whenever backends hold per-client state that isn't shared across the fleet — a WebSocket connection, an in-memory session cache. Least-connections would happily route the same client to a different backend on their next request, losing that state. If state is externalized (session store in Redis, as in most chapters in this book), least-connections becomes viable again since stickiness no longer matters.

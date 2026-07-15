@@ -46,9 +46,42 @@ graph TD
 
 It's also a **single point of failure and a latency bottleneck** by construction — every request pays its overhead. It must be deployed as a horizontally-scaled, stateless fleet behind its own load balancer (see [[CS Fundamentals/02 - Networking/Load Balancing|Load Balancing]]), never as a single instance.
 
+## Scaling: 1 service to a whole platform
+
+```mermaid
+flowchart TD
+    A["1 service<br/>no gateway needed"] --> B["Few services<br/>gateway starts adding<br/>real value: centralized<br/>auth/rate-limiting"]
+    B --> C["Many services, many teams<br/>gateway becomes essential<br/>infrastructure; BFF pattern<br/>may be needed per client type"]
+    C --> D["Massive scale<br/>gateway itself is now<br/>capacity-planning-critical —<br/>EVERY request pays its cost"]
+```
+
+At small scale, a gateway is genuinely optional overhead. As the number of services and teams grows, the gateway's centralization value compounds — each new service gets auth/rate-limiting/TLS for free instead of reimplementing them. At massive scale, the gateway stops being "just infrastructure" and becomes a first-class capacity-planning concern in its own right, since its latency is additive to literally every request in the system — under-provisioning it doesn't degrade one feature, it degrades everything simultaneously.
+
+## Failure scenarios
+
+> [!bug] What actually happens
+> - **The gateway goes down:** covered above — the entire system becomes unreachable from outside, the sharpest possible blast radius in this architecture.
+> - **The gateway becomes a bottleneck under load:** without adequate horizontal scaling, gateway latency directly adds to every request's total latency, and gateway saturation can look like a system-wide outage even when every backend service behind it is perfectly healthy — a real, confusing failure mode to diagnose if you don't check the gateway first.
+> - **A bad deploy to the gateway itself:** since every request flows through it, a bug here has a blast radius spanning the entire system — categorically different from a bug in one backend service, which only affects that service's own callers.
+
+## Monitoring
+
+> [!info] What to watch
+> **Gateway-added latency** — the direct overhead per request, a genuinely critical number given it's paid by every single request in the system. **Gateway error rate** — separate from backend error rates, since a gateway-level failure (auth service down, misconfiguration) can produce errors with zero actual backend involvement. **Per-route traffic distribution** — the gateway's own vantage point makes it a natural place to observe which service is under the most load system-wide.
+
+## Common mistakes
+
+> [!warning] Real, recurring errors
+> 1. **Letting the gateway accumulate business logic** — the "real failure mode" section above; keep it a thin, cross-cutting layer.
+> 2. **Running a single gateway instance** — recreates the exact SPOF pattern named throughout this book.
+> 3. **Not treating gateway deploys with the same rigor as backend deploys** — given its outsized blast radius, a gateway change deserves *more* deployment caution (canarying, careful rollback readiness) than an average backend service change, not less.
+
 ---
 
 ## Interview Q&A
+
+> [!info] Leveled by seniority
+> **Beginner:** "What does an API gateway do?" — centralizes routing, auth, rate limiting, and TLS termination at a system's edge. **Intermediate:** "How is an API gateway different from a service mesh?" — Section on API Gateway vs. Service Mesh, north-south vs. east-west traffic. **Senior:** "System-wide latency spiked suddenly with no backend changes — where do you look first?" — expects checking the gateway's own added latency and error rate before assuming a backend issue, given its position in every request path. **Staff:** "Design the gateway strategy for a platform serving both a mobile app and a partner-facing public API with very different rate-limit and auth needs." — expects the BFF pattern named explicitly, or at minimum distinct routing/policy configuration per client type behind a shared gateway layer. **Architect:** "How would you evolve a single monolithic API gateway into something that scales with an organization adding new services weekly?" — expects discussion of keeping the gateway itself thin (Section "The real failure mode") and pushing service-specific logic into a mesh or the services themselves, preventing the gateway from becoming the very bottleneck-monolith it was meant to help avoid.
 
 > [!question]- Why terminate TLS at the gateway instead of at each service?
 > Centralizes certificate management (one place to rotate/renew certs instead of N services each managing their own), and lets internal services skip the CPU cost of TLS handshakes for every internal hop — traded for trusting the internal network boundary (or re-encrypting internally via mTLS for higher-security requirements, a real, explicit choice depending on the threat model).
