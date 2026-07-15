@@ -99,6 +99,7 @@ How multiple machines agree, coordinate, and stay available when parts of the sy
 | 6.5 | [[CS Fundamentals/06 - Distributed Systems/Resilience Patterns\|Resilience Patterns]] | ✅ |
 | 6.6 | [[CS Fundamentals/06 - Distributed Systems/Service Discovery\|Service Discovery]] | ✅ |
 | 6.7 | [[CS Fundamentals/06 - Distributed Systems/Scalability Patterns\|Scalability Patterns]] (consolidated reference — horizontal/vertical, replicas, sharding, caching, async absorption, geography) | ✅ |
+| 6.8 | [[CS Fundamentals/06 - Distributed Systems/Distributed Transactions - Saga Pattern and Two-Phase Commit\|Distributed Transactions: Saga Pattern & Two-Phase Commit]] | ✅ |
 
 ## Tier 7 — Architecture & Deployment Patterns
 

@@ -12,6 +12,6 @@ tags: [system-design, glossary]
 E.g. "book flight → book hotel → charge card" — if charging the card fails, the Saga runs "cancel hotel" and "cancel flight" as compensating actions. Eventually consistent (there's a window where some steps are done and others aren't) but scales far better than 2PC and doesn't hold cross-service locks.
 
 > [!tip] This is a glossary stub
-> Full explanation lives in: [[HLD/07 - Scalability & Resilience Patterns/Index|HLD 07 - Scalability & Resilience Patterns]] (once written).
+> Full explanation lives in: [[CS Fundamentals/06 - Distributed Systems/Distributed Transactions - Saga Pattern and Two-Phase Commit|Distributed Transactions: Saga Pattern & Two-Phase Commit]].
 
-**Used in:** [[HLD/07 - Scalability & Resilience Patterns/Index|HLD 07 - Scalability & Resilience Patterns]]
+**Used in:** [[CS Fundamentals/06 - Distributed Systems/Distributed Transactions - Saga Pattern and Two-Phase Commit|Distributed Transactions: Saga Pattern & Two-Phase Commit]] · [[CS Fundamentals/07 - Architecture and Deployment Patterns/Event-Driven Architecture|Event-Driven Architecture]] · [[HLD/23 - Design an E-commerce System/Design an E-commerce System|Design an E-commerce System]]

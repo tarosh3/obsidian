@@ -12,6 +12,6 @@ tags: [system-design, glossary]
 Strongly consistent, but **blocking** — if the coordinator crashes between prepare and commit, participants are stuck holding locks indefinitely. Doesn't scale well across many services or high latency links, which is why [[Saga Pattern|Saga]] is the more common modern answer for distributed transactions at scale.
 
 > [!tip] This is a glossary stub
-> Full explanation lives in: [[HLD/07 - Scalability & Resilience Patterns/Index|HLD 07 - Scalability & Resilience Patterns]] (once written).
+> Full explanation lives in: [[CS Fundamentals/06 - Distributed Systems/Distributed Transactions - Saga Pattern and Two-Phase Commit|Distributed Transactions: Saga Pattern & Two-Phase Commit]].
 
-**Used in:** [[HLD/07 - Scalability & Resilience Patterns/Index|HLD 07 - Scalability & Resilience Patterns]]
+**Used in:** [[CS Fundamentals/06 - Distributed Systems/Distributed Transactions - Saga Pattern and Two-Phase Commit|Distributed Transactions: Saga Pattern & Two-Phase Commit]]

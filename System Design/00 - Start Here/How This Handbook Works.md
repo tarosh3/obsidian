@@ -77,7 +77,10 @@ Interview question → requirement clarification → **bad first draft** (the na
 
 Chapters are written **one at a time, on request** — say *"write [chapter name]"* and it's produced to the full standard above. The three below are already written as the reference standard for everything that follows.
 
-### ✅ Written (reference-quality, read these to calibrate the bar) — 95 chapters so far
+### ✅ Written (reference-quality, read these to calibrate the bar) — 96 chapters so far
+
+> [!success] Saga Pattern & 2PC now a full chapter, plus every CS Fundamentals chapter retrofitted
+> [[CS Fundamentals/06 - Distributed Systems/Distributed Transactions - Saga Pattern and Two-Phase Commit|Distributed Transactions: Saga Pattern & Two-Phase Commit]] replaces what were previously two broken glossary stubs pointing at a never-written HLD chapter — now a full Tier 6 chapter covering 2PC's exact blocking failure mode, Saga's compensating-transaction cascade, and precisely why Saga is the industry default for cross-service transactions at scale. Separately, every already-written CS Fundamentals chapter has now been retrofitted with the mega-prompt's 5 previously-missing sections (Scaling, Failure Scenarios, Monitoring, Common Mistakes, leveled Interview Q&A) — the full foundation-handbook spec is now closed with zero remaining gaps.
 
 > [!success] CS Fundamentals learning path fully complete — all 11 tiers, all mega-prompt required chapters covered
 > [[CS Fundamentals/00 - Learning Path|The CS Fundamentals Learning Path]] has zero pending items. The last 3 gaps from a full cross-check against the original foundation-handbook spec are now closed: Kafka expanded to standalone-book depth ([[CS Fundamentals/05 - Messaging & Streaming/Kafka Ecosystem and Production Patterns|Kafka Ecosystem & Production Patterns]] — Streams, Connect, Schema Registry, Avro/Protobuf, Outbox Pattern, Kafka-style DLQ, capacity planning), [[CS Fundamentals/05 - Messaging & Streaming/Kafka Alternatives - Pulsar, NATS and Redis Streams|Kafka Alternatives]] (Pulsar's compute/storage separation, NATS, Redis Streams), and [[CS Fundamentals/06 - Distributed Systems/Scalability Patterns|Scalability Patterns]] (the consolidated, named reference tying together every scaling lever already used throughout this handbook).
