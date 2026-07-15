@@ -77,7 +77,10 @@ Interview question → requirement clarification → **bad first draft** (the na
 
 Chapters are written **one at a time, on request** — say *"write [chapter name]"* and it's produced to the full standard above. The three below are already written as the reference standard for everything that follows.
 
-### ✅ Written (reference-quality, read these to calibrate the bar) — 96 chapters so far
+### ✅ Written (reference-quality, read these to calibrate the bar) — 100 chapters so far
+
+> [!success] 4 genuine gap-audit additions: Idempotency, Bloom Filter, Geospatial Indexing, REST/gRPC/GraphQL
+> A fresh audit (not part of the original mega-prompt checklist) surfaced 4 real, commonly-interviewed topics that were either thin glossary stubs or entirely absent: [[CS Fundamentals/06 - Distributed Systems/Idempotency|Idempotency]] (the required-safety property underneath retries, Sagas, and event-driven consumers, previously just a stub with dead HLD links), [[CS Fundamentals/06 - Distributed Systems/Bloom Filter and Probabilistic Membership|Bloom Filter & Probabilistic Membership]] (false-positive-rate math, Counting/Cuckoo Filter variants, same dead-link problem fixed), [[CS Fundamentals/06 - Distributed Systems/Geospatial Indexing|Geospatial Indexing]] (geohash vs. quadtree vs. S2/H3, generalizing what Uber and Food Delivery already used applied), and [[CS Fundamentals/02 - Networking/REST, gRPC and GraphQL|REST, gRPC & GraphQL]] (closing a gap this handbook's own checklist had self-flagged as pending — GraphQL's N+1 problem, gRPC's 4 streaming call types, and the precise 3-way tradeoff table).
 
 > [!success] Saga Pattern & 2PC now a full chapter, plus every CS Fundamentals chapter retrofitted
 > [[CS Fundamentals/06 - Distributed Systems/Distributed Transactions - Saga Pattern and Two-Phase Commit|Distributed Transactions: Saga Pattern & Two-Phase Commit]] replaces what were previously two broken glossary stubs pointing at a never-written HLD chapter — now a full Tier 6 chapter covering 2PC's exact blocking failure mode, Saga's compensating-transaction cascade, and precisely why Saga is the industry default for cross-service transactions at scale. Separately, every already-written CS Fundamentals chapter has now been retrofitted with the mega-prompt's 5 previously-missing sections (Scaling, Failure Scenarios, Monitoring, Common Mistakes, leveled Interview Q&A) — the full foundation-handbook spec is now closed with zero remaining gaps.
@@ -197,12 +200,12 @@ Chapters are written **one at a time, on request** — say *"write [chapter name
 ### 🎯 CS Fundamentals — full technology checklist
 
 **Operating Systems:** Processes & Threads ✅ · CPU Scheduling · Virtual Memory & Paging · Segmentation · Synchronization Primitives (Mutex/Semaphore) · Deadlocks · Interrupts & System Calls · NUMA · Cache Coherency.
-**Networking:** TCP Deep Dive ✅ · HTTP/1.1 → HTTP/2 → HTTP/3 & QUIC ✅ · DNS Resolution ✅ · Load Balancing (L4/L7) ✅ · API Gateway ✅ · CDN Internals ✅ · UDP · TLS Handshake · NAT · Packet Routing · **GraphQL** (query language internals, N+1 problem, resolvers).
+**Networking:** TCP Deep Dive ✅ · HTTP/1.1 → HTTP/2 → HTTP/3 & QUIC ✅ · DNS Resolution ✅ · Load Balancing (L4/L7) ✅ · API Gateway ✅ · CDN Internals ✅ · REST, gRPC & GraphQL (query language internals, N+1 problem, resolvers) ✅ · UDP · TLS Handshake · NAT · Packet Routing.
 **Security:** Authentication & Authorization (sessions, JWT, OAuth2, refresh-token rotation) ✅ · Encryption at Rest/Transit · Zero Trust · Secrets Management.
 **Databases:** Indexes & B+ Trees ✅ · SQL Query Execution Deep Dive ✅ · Cassandra Internals ✅ · MongoDB Internals ✅ · Partitioning/Sharding ✅ (see Distributed Systems) · ACID & Isolation Levels (dirty/non-repeatable/phantom reads) ✅ · Write-Ahead Log (WAL) · Replication · SQL vs NoSQL.
 **Caching:** Caching Strategies ✅ · Redis Internals ✅ · Memcached Internals ✅.
 **Messaging & Streaming:** Kafka Internals ✅ · Kafka Ecosystem & Production Patterns (Streams, Connect, Schema Registry, Avro/Protobuf, Outbox, DLQ) ✅ · RabbitMQ Internals ✅ · Pulsar ✅ · NATS ✅ · Redis Streams ✅.
-**Distributed Systems:** CAP & PACELC ✅ · Consistent Hashing ✅ · Raft & Paxos / Consensus ✅ · Sharding & Partitioning ✅ · Resilience Patterns (Circuit Breaker, Retry, Bulkhead) ✅ · Service Discovery ✅ · Scalability Patterns ✅ · Gossip Protocol · Leader Election · Vector Clocks & Lamport Clocks · Distributed Locks · Idempotency · ZooKeeper.
+**Distributed Systems:** CAP & PACELC ✅ · Consistent Hashing ✅ · Raft & Paxos / Consensus ✅ · Sharding & Partitioning ✅ · Resilience Patterns (Circuit Breaker, Retry, Bulkhead) ✅ · Service Discovery ✅ · Scalability Patterns ✅ · Distributed Transactions (Saga & 2PC) ✅ · Idempotency ✅ · Bloom Filter & Probabilistic Membership ✅ · Geospatial Indexing (Geohash, Quadtree, S2/H3) ✅ · Gossip Protocol · Leader Election · Vector Clocks & Lamport Clocks · Distributed Locks · ZooKeeper.
 **Design Principles:** SOLID Principles (all 5, with the code proving each) ✅ · Design Patterns Cheat Sheet (all 23 GoF patterns) ✅.
 
 ---

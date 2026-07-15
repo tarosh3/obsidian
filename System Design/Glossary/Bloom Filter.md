@@ -11,4 +11,7 @@ tags: [system-design, glossary]
 
 Works by hashing an item through several hash functions and setting bits in a bit array; checking membership hashes the same way and checks if all those bits are set. Used to avoid expensive lookups for known-absent keys (e.g. "check the Bloom filter before querying the database — if it says no, skip the query entirely").
 
-**Used in:** [[HLD/07 - Scalability & Resilience Patterns/Index|HLD 07 - Scalability & Resilience Patterns]], [[HLD/09 - Case Studies/Index|HLD 09 - Case Studies]] (Web Crawler dedup)
+> [!tip] This is a glossary stub
+> Full explanation lives in: [[CS Fundamentals/06 - Distributed Systems/Bloom Filter and Probabilistic Membership|Bloom Filter & Probabilistic Membership]].
+
+**Used in:** [[CS Fundamentals/06 - Distributed Systems/Bloom Filter and Probabilistic Membership|Bloom Filter & Probabilistic Membership]] · [[HLD/12 - Design a Web Crawler/Design a Web Crawler|Design a Web Crawler]] (URL dedup) · [[CS Fundamentals/03 - Databases/Cassandra Internals|Cassandra Internals]] (SSTable read path)

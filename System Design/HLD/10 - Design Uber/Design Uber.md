@@ -40,6 +40,9 @@ Assume 5M active drivers, each reporting location every 4 seconds → **~1.25M l
 
 ## Step 5 — Deep dive: geohash vs quadtree, and matching as two-stage filtering
 
+> [!info] General theory, if this moves too fast
+> [[CS Fundamentals/06 - Distributed Systems/Geospatial Indexing|Geospatial Indexing]] covers geohash, quadtree, and S2/H3 as general data structures, independent of this specific ride-hailing use case — read it for the underlying algorithm and complexity, come back here for the applied numbers.
+
 ### Geohash vs quadtree — a genuine tradeoff, not two names for the same thing
 
 **Geohash** produces a **uniform grid** — every cell is the same size regardless of actual driver density. **Quadtree** recursively subdivides space, with **more subdivision in dense areas** — a genuine advantage for wildly uneven density (Manhattan vs a rural highway): a quadtree naturally adapts its resolution to where the data actually is, while geohash cells stay a fixed size everywhere whether that area is packed or empty.

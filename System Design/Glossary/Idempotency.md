@@ -14,4 +14,7 @@ tags: [system-design, glossary]
 > [!quote] Interview framing
 > "Your payment consumer crashed mid-processing and restarted — did the user get charged twice?" is one of the most common messaging-system interview questions — the correct answer is always "no, because the write is idempotent via a dedup key," not "we made sure it never crashes."
 
-**Used in:** [[HLD/02 - Networking, APIs & Load Balancing/Index|HLD 02 - Networking, APIs & Load Balancing]], [[HLD/06 - Messaging & Event-Driven Systems/Index|HLD 06 - Messaging & Event-Driven Systems]]
+> [!tip] This is a glossary stub
+> Full explanation lives in: [[CS Fundamentals/06 - Distributed Systems/Idempotency|Idempotency]].
+
+**Used in:** [[CS Fundamentals/06 - Distributed Systems/Idempotency|Idempotency]] · [[CS Fundamentals/06 - Distributed Systems/Resilience Patterns|Resilience Patterns]] · [[HLD/17 - Design a Payment System/Design a Payment System|Design a Payment System]]

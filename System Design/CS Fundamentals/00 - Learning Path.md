@@ -48,6 +48,7 @@ How machines talk to each other — the layer every distributed system, HLD chap
 | 2.4 | [[CS Fundamentals/02 - Networking/API Gateway\|API Gateway]] | ✅ |
 | 2.5 | [[CS Fundamentals/02 - Networking/CDN Internals\|CDN Internals]] | ✅ |
 | 2.6 | [[CS Fundamentals/02 - Networking/Reverse Proxy\|Reverse Proxy]] | ✅ |
+| 2.7 | [[CS Fundamentals/02 - Networking/REST, gRPC and GraphQL\|REST, gRPC & GraphQL]] | ✅ |
 
 ## Tier 3 — Databases & Storage Engines
 
@@ -100,6 +101,9 @@ How multiple machines agree, coordinate, and stay available when parts of the sy
 | 6.6 | [[CS Fundamentals/06 - Distributed Systems/Service Discovery\|Service Discovery]] | ✅ |
 | 6.7 | [[CS Fundamentals/06 - Distributed Systems/Scalability Patterns\|Scalability Patterns]] (consolidated reference — horizontal/vertical, replicas, sharding, caching, async absorption, geography) | ✅ |
 | 6.8 | [[CS Fundamentals/06 - Distributed Systems/Distributed Transactions - Saga Pattern and Two-Phase Commit\|Distributed Transactions: Saga Pattern & Two-Phase Commit]] | ✅ |
+| 6.9 | [[CS Fundamentals/06 - Distributed Systems/Idempotency\|Idempotency]] | ✅ |
+| 6.10 | [[CS Fundamentals/06 - Distributed Systems/Bloom Filter and Probabilistic Membership\|Bloom Filter & Probabilistic Membership]] | ✅ |
+| 6.11 | [[CS Fundamentals/06 - Distributed Systems/Geospatial Indexing\|Geospatial Indexing]] (geohash, quadtree, S2/H3) | ✅ |
 
 ## Tier 7 — Architecture & Deployment Patterns
 

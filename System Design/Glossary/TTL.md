@@ -11,4 +11,4 @@ tags: [system-design, glossary]
 
 Two common contexts: a **DNS record's TTL** tells resolvers how long they may cache an IP before re-querying. A **cache entry's TTL** tells the cache when to expire/evict a key automatically. Short TTL = fresher data, more origin load. Long TTL = less load, more risk of serving stale data. Picking TTL is always this one tradeoff, restated per use case.
 
-**Used in:** [[HLD/02 - Networking, APIs & Load Balancing/Index|HLD 02 - Networking, APIs & Load Balancing]], [[HLD/04 - Caching/Index|HLD 04 - Caching]]
+**Used in:** [[CS Fundamentals/02 - Networking/HTTP Evolution & DNS Resolution|HTTP Evolution & DNS Resolution]] (DNS TTL) · [[CS Fundamentals/04 - Caching/Caching Strategies|Caching Strategies]] (cache TTL) · [[CS Fundamentals/06 - Distributed Systems/Idempotency|Idempotency]] (idempotency-key TTL)
