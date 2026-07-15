@@ -71,9 +71,40 @@ Redis Streams is an append-only log **data structure inside Redis itself** — r
 > [!success] Direct connections
 > [[CS Fundamentals/05 - Messaging & Streaming/Kafka Internals|Kafka Internals]] and [[CS Fundamentals/05 - Messaging & Streaming/RabbitMQ Internals|RabbitMQ Internals]] — the two systems most of this handbook's HLD chapters actually reach for; this chapter exists to answer "what about the alternatives" precisely rather than leave it unaddressed. [[CS Fundamentals/04 - Caching/Redis Internals|Redis Internals]] — Redis Streams' single-threaded, in-memory foundation is exactly what's already covered there.
 
+## Scaling: small workload to multi-cluster, geo-distributed
+
+```mermaid
+flowchart TD
+    A["Small workload<br/>any of these systems fit"] --> B["Growing<br/>Kafka/Pulsar pull ahead for<br/>real streaming needs; NATS/Redis<br/>Streams stay fine for their narrower fit"]
+    B --> C["Massive scale<br/>Pulsar's compute/storage separation<br/>becomes a real operational advantage;<br/>Redis Streams hits its memory ceiling"]
+    C --> D["Multi-cluster, geo-distributed<br/>Pulsar has BUILT-IN geo-replication;<br/>Kafka needs MirrorMaker as a separate add-on"]
+```
+
+## Failure scenarios
+
+> [!bug] What actually happens
+> - **A Pulsar broker crashes:** no data loss, no re-replication needed — covered above, worth restating as the direct payoff of compute/storage separation under an actual failure, not just an architectural curiosity.
+> - **A NATS node without JetStream crashes:** messages in flight are simply **lost** — fire-and-forget has no durability by design, a real, deliberate tradeoff worth naming as a failure mode, not just a design choice made in the abstract.
+> - **Redis Streams hits Redis's memory limit:** either eviction of stream data or Redis running out of memory entirely — a hard operational wall, not a gradual degradation, given Redis Streams' memory-bound nature (the bug callout above).
+
+## Monitoring
+
+> [!info] What to watch, per system chosen
+> **Redis Streams:** memory usage against the configured limit — the direct precursor to the failure scenario above. **Pulsar:** per-broker and per-bookie (BookKeeper node) load, given the two-layer architecture. **NATS (without JetStream):** message loss rate, since there's no durability to fall back on if delivery fails.
+
+## Common mistakes
+
+> [!warning] Real, recurring errors
+> 1. **Choosing NATS core (no JetStream) for anything requiring durability** — fire-and-forget delivery means genuine, permanent message loss is possible by design, not an edge case.
+> 2. **Not sizing Redis Streams' expected data volume against available memory upfront** — discovering the memory ceiling in production is a far worse time to learn this than during initial capacity planning.
+> 3. **Adopting Pulsar's operational complexity without actually needing compute/storage separation** — if broker-failure recovery time was never a real concern, Pulsar's added operational surface (two systems instead of one) is cost without corresponding benefit.
+
 ---
 
 ## Interview Q&A
+
+> [!info] Leveled by seniority
+> **Beginner:** "Name an alternative to Kafka and one reason someone might choose it." — any of Pulsar/NATS/Redis Streams with their named advantage. **Intermediate:** "How does Pulsar's architecture genuinely differ from Kafka's?" — compute/storage separation via BookKeeper, covered above. **Senior:** "A team wants to add simple event streaming to a service that already runs Redis, with modest volume — recommend an approach." — expects Redis Streams named as the right fit specifically because it avoids new infrastructure, with the memory-ceiling caveat stated proactively. **Staff:** "Design the messaging infrastructure for a system requiring geo-replicated event streaming across 3 continents." — expects Pulsar's built-in geo-replication named as a genuine differentiator here, or Kafka + MirrorMaker as the alternative path, with an explicit tradeoff between the two. **Architect:** "How would you evaluate whether an existing Kafka deployment should be replaced with Pulsar for a large organization?" — expects a real cost-benefit walkthrough: migration cost and Pulsar's added operational complexity (two systems) weighed against the specific, named benefit (simpler broker-failure recovery, independent compute/storage scaling) — not a reflexive "newer is better" recommendation.
 
 > [!question]- When would you genuinely choose Pulsar over Kafka, not just as a Kafka clone?
 > When broker-failure recovery time is a critical concern (Pulsar's stateless brokers mean failover doesn't wait on re-replication), or when you specifically want to scale compute (brokers) and storage (BookKeeper) independently of each other — Kafka couples the two since brokers own their own storage directly.

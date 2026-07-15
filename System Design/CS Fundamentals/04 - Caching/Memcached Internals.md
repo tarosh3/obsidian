@@ -61,9 +61,43 @@ A Memcached instance knows **nothing** about any other Memcached instance — un
 
 Needing **persistence** — a restart loses everything, with no RDB/AOF equivalent at all. Needing **atomic operations beyond simple incr/decr** or any structure richer than a blob. Needing **built-in replication** for cache-layer fault tolerance.
 
+## 8. Scaling: 1 instance to a large client-sharded fleet
+
+```mermaid
+flowchart TD
+    A["1 instance<br/>fine for a small cache"] --> B["Growing<br/>client-side consistent<br/>hashing adds instances"]
+    B --> C["Many instances<br/>slab calcification risk<br/>grows with workload shifts<br/>over time"]
+    D["Massive scale<br/>EVERY client must keep its<br/>hashing config in sync —<br/>a real coordination challenge<br/>Redis Cluster doesn't have"]
+    C --> D
+```
+
+Because Memcached instances are mutually unaware (Section 5), scaling out means every client library across the fleet must agree on the same consistent-hashing configuration — unlike Redis Cluster, where the server-side cluster itself is the single source of truth for key ownership. At large scale, this becomes a genuine coordination challenge: a client with a stale or misconfigured hashing setup can silently miss the cache for keys another client would have found, since the two disagree about which instance owns what.
+
+## 9. Failure scenarios
+
+> [!bug] What actually happens — genuinely different from Redis
+> - **An instance crashes:** with no replication at all, **every key it held is gone instantly** — a meaningfully different failure mode from Redis, which at least *can* replicate. The consistent-hashing ring routes around the dead instance going forward, but existing keys mapped to it are simply cache misses until repopulated from the source of truth.
+> - **Slab calcification degrading effective capacity:** a slow-building failure, not a sudden one — a shifting item-size distribution over time silently reduces usable cache capacity in one size class while another sits with unused chunks, with no single obvious signal until hit rate has already degraded.
+> - **Client-side hashing config drift:** different clients in the fleet disagreeing about which instance owns a given key — causes inconsistent cache behavior across the fleet (one client's write is invisible to another client's read of the "same" key) without any error being raised anywhere.
+
+## 10. Monitoring
+
+> [!info] What to watch
+> **Per-instance memory usage and eviction rate, broken down by slab class** — the direct, specific tool for catching slab calcification before it silently degrades hit rate. **Hit rate per instance** — detects an unevenly-loaded shard, whether from a hashing skew or a genuine hot-key problem. **Client hashing-ring consistency across the fleet** — a real, easy-to-overlook check given how Memcached's client-side sharding model works.
+
+## 11. Common mistakes
+
+> [!warning] Real, recurring errors
+> 1. **Assuming Memcached replicates data** — it doesn't; a crash always means real, immediate data loss for that instance's keys, with the source of truth as the only recovery path.
+> 2. **Not monitoring per-slab-class metrics** — missing slab calcification until it's already meaningfully degraded hit rate, since aggregate cache-wide metrics can look healthy while one size class is starved.
+> 3. **Reaching for Memcached when rich data structures or persistence are actually needed** — Section 7's "when NOT to use" list, worth checking against actual requirements before defaulting to Memcached for "just caching."
+
 ---
 
 ## 🎯 Interview follow-up Q&A
+
+> [!info] Leveled by seniority
+> **Beginner:** "What does Memcached do?" — simple, fast, in-memory blob caching, deliberately narrow in scope. **Intermediate:** "How does the slab allocator avoid fragmentation?" — Section 3's size-class chunking. **Senior:** "A Memcached cluster's overall hit rate looks fine, but a specific workload is performing poorly — diagnose it." — expects checking per-instance and per-slab-class metrics rather than trusting the aggregate number, since calcification or an uneven shard can hide behind a healthy-looking average. **Staff:** "Design a migration plan from a single Memcached instance to a client-sharded fleet of 10, with zero downtime." — expects reasoning about the transition period where old and new hashing configs might briefly disagree across a rolling client deployment, and accepting a temporary, bounded increase in cache misses during that window rather than assuming an instant, clean cutover. **Architect:** "How would you decide between Memcached's client-side sharding and Redis Cluster's server-side sharding for a new large-scale caching layer?" — expects a real tradeoff: Memcached trades coordination complexity (every client must agree) for simplicity and raw multi-threaded throughput per instance; Redis Cluster centralizes that coordination at the cost of adopting Redis's broader feature surface even if most of it goes unused.
 
 > [!quote]- "How does Memcached avoid memory fragmentation?"
 > Via a slab allocator — memory pre-divided into fixed size-class chunks, with each stored item placed into the smallest chunk class that fits it, avoiding the constant malloc/free churn that causes classic fragmentation.

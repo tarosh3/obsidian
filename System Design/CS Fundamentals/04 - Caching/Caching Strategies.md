@@ -68,9 +68,43 @@ Cache penetration is requests for keys that **don't exist in the DB at all** (an
 - **Cache the negative result too** — store "this key doesn't exist" with a short TTL, so repeated misses for the same nonexistent key don't repeatedly hit the DB.
 - **[[Glossary/Bloom Filter|Bloom filter]] in front of the DB** — cheaply reject queries for keys that provably don't exist, before ever touching cache or DB at all.
 
+## 7. Scaling: 1 request to a distributed cache cluster
+
+```mermaid
+flowchart TD
+    A["1 request<br/>no cache benefit"] --> B["Growing traffic<br/>cache-aside becomes default,<br/>hit rate matters"]
+    B --> C["High traffic on hot keys<br/>stampede protection<br/>essential (singleflight)"]
+    C --> D["Massive scale<br/>the cache ITSELF needs sharding/<br/>replication, and invalidation<br/>must propagate across the cluster"]
+```
+
+At the largest scale, caching stops being "one cache in front of one database" — the cache layer itself becomes a distributed system, needing [[CS Fundamentals/06 - Distributed Systems/Consistent Hashing|consistent hashing]] or server-side sharding (per [[CS Fundamentals/04 - Caching/Redis Internals|Redis Cluster]]) to scale, and **invalidation must now propagate across every relevant shard/replica**, not just one in-process map — a genuinely harder version of the same "the two hard problems in computer science" challenge named above.
+
+## 8. Failure scenarios
+
+> [!bug] What actually happens
+> - **The cache goes down entirely:** every request falls through to the database — which must now absorb the **full** load the cache was previously handling, a real capacity risk if the cache was absorbing the majority of read traffic, not just a graceful degradation.
+> - **A forgotten invalidation path serves stale data indefinitely:** Section 4's real bug pattern — a new write path added later that doesn't know it needs to invalidate the cache, silently serving stale reads until the TTL (if any) eventually expires.
+> - **A write-back cache crashes with unflushed dirty data:** the durability risk named in Section 2, made concrete — data acknowledged as "written" from the application's perspective is genuinely gone if the cache dies before the async flush to the database completes.
+
+## 9. Monitoring
+
+> [!info] What to watch
+> **Cache hit rate** — the single most fundamental cache health metric; a decline signals either a changing access pattern or a cache too small for the current working set. **Eviction rate** — a rising rate confirms the cache is undersized relative to demand, not just an isolated blip. **Singleflight/stampede-collapse rate** — how often concurrent requests are being coalesced into one, a direct signal of how "hot" specific keys actually are in practice.
+
+## 10. Common mistakes
+
+> [!warning] Real, recurring errors
+> 1. **Forgetting to invalidate on a newly-added write path** — Section 4's core, recurring bug pattern.
+> 2. **Using write-back for data that can't tolerate loss** — trading real durability risk for write speed without deliberately deciding that tradeoff is acceptable for this specific data.
+> 3. **Not distinguishing cache stampede from cache penetration** — Section 5 vs. Section 6; each needs a genuinely different fix, and applying the wrong one doesn't help.
+> 4. **Setting TTLs uniformly across all keys** — ignoring that some keys are far hotter than others; a uniform TTL either wastes freshness on cold keys or under-protects hot ones from stampede risk.
+
 ---
 
 ## 🎯 Interview follow-up Q&A
+
+> [!info] Leveled by seniority
+> **Beginner:** "What is cache-aside?" — the app checks cache first, reads the DB on miss, then populates the cache. **Intermediate:** "What's the difference between cache stampede and cache penetration?" — Section 6's precise distinction. **Senior:** "A specific key's cache hit rate suddenly dropped to near-zero — diagnose it." — expects checking whether the key started expiring on a shorter cycle, was evicted due to memory pressure, or whether a bug is bypassing the cache-population step entirely, rather than guessing. **Staff:** "Design a caching strategy for a system where 1% of keys account for 90% of traffic." — expects refresh-ahead or dedicated stampede protection specifically for that hot 1%, distinct from the default policy for the long tail. **Architect:** "How would cache invalidation change as a single in-process cache grows into a distributed, multi-node cache cluster?" — expects Section 7's answer: invalidation must now be propagated across every relevant node, turning a previously-local operation into a genuinely distributed one with its own consistency considerations.
 
 > [!quote]- "Cache-aside vs write-through — when would you pick each?"
 > Cache-aside fits read-heavy, DB-of-record workloads where you want the cache to only ever hold what's actually been requested, and want resilience to cache outages (fall through to DB). Write-through fits workloads where read-after-write consistency matters and you're willing to pay write latency for it.

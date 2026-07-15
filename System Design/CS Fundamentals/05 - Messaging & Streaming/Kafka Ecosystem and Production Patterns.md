@@ -103,9 +103,40 @@ The fix: write the event to an **outbox table** in the **same database transacti
 > [!info] Full comparison
 > [[CS Fundamentals/05 - Messaging & Streaming/Kafka Alternatives - Pulsar, NATS and Redis Streams|Kafka Alternatives: Pulsar, NATS & Redis Streams]] covers Pulsar, NATS, and Redis Streams in depth. [[CS Fundamentals/05 - Messaging & Streaming/RabbitMQ Internals|RabbitMQ Internals]] and [[CS Fundamentals/05 - Messaging & Streaming/Kafka Internals|Kafka Internals']] own comparison table cover Kafka vs. RabbitMQ specifically.
 
+## Scaling: a few connectors to a large integration surface
+
+```mermaid
+flowchart TD
+    A["Few connectors<br/>simple to manage manually"] --> B["Growing integration surface<br/>Kafka Connect DISTRIBUTED mode<br/>needed for fault tolerance,<br/>not single-process mode"]
+    B --> C["Many schemas, many teams<br/>Schema Registry compatibility<br/>enforcement becomes essential<br/>infrastructure, not optional"]
+    C --> D["Massive event volume via Outbox<br/>the outbox table itself + its CDC<br/>read can become a real bottleneck<br/>if not indexed/cleaned properly"]
+```
+
+## Failure scenarios
+
+> [!bug] What actually happens
+> - **A Kafka Streams instance crashes:** state rebuilds from the changelog topic (covered above) — but for large state, this **rebuild time** is a real, measurable cost, not instantaneous; worth accounting for in recovery-time expectations, not assuming state recovery is free.
+> - **A Kafka Connect connector fails:** in distributed mode, its work redistributes to another worker in the Connect cluster — a reconciliation-loop pattern structurally similar to [[CS Fundamentals/07 - Architecture and Deployment Patterns/Kubernetes Fundamentals|Kubernetes']] desired-state reconciliation, applied here to connector tasks instead of pods.
+> - **The outbox table's CDC connector falls behind:** events accumulate, undelivered, in the outbox table — a real, **monitorable** backlog rather than a silent failure, as long as it's actually being watched.
+
+## Monitoring
+
+> [!info] What to watch
+> **Kafka Streams state-store rebuild time after a restart** — directly informs real recovery-time expectations for stateful stream processing. **Kafka Connect connector/task failure rate** — the direct signal for integration-pipeline health. **Outbox table backlog size** (rows not yet picked up by CDC) — the direct, measurable signal of publishing lag in the Outbox Pattern specifically.
+
+## Common mistakes
+
+> [!warning] Real, recurring errors
+> 1. **Running Kafka Connect in standalone (non-distributed) mode for production workloads** — loses the fault-tolerance and work-redistribution benefits distributed mode provides.
+> 2. **Not indexing or cleaning the outbox table** — lets it grow unbounded, degrading the CDC read's performance over time.
+> 3. **Treating Schema Registry as optional until a breaking change already caused an incident** — the entire value of Schema Registry is catching the problem *before* it reaches production, not after.
+
 ---
 
 ## Interview Q&A
+
+> [!info] Leveled by seniority
+> **Beginner:** "What does Kafka Connect do?" — moves data in/out of Kafka via standardized connectors, no custom integration code. **Intermediate:** "Why does the Outbox Pattern solve the dual-write problem?" — the "Production pattern: the Outbox Pattern" section, one atomic DB transaction instead of two separate systems needing to succeed together. **Senior:** "A Kafka Streams application's recovery time after a crash is longer than expected — diagnose it." — expects checking state-store size and changelog-topic replay volume as the direct cause, not assuming a Kafka-wide issue. **Staff:** "Design a schema-evolution policy for a growing number of teams publishing to shared Kafka topics." — expects Schema Registry with enforced backward/forward compatibility rules named explicitly, plus a real governance process for who can register breaking changes. **Architect:** "How would you decide whether a data-integration need should use Kafka Connect or a custom-built consumer/producer pair?" — expects a real tradeoff: Connect for standard, well-supported source/sink patterns (reduces custom code and operational surface), custom code when the integration logic is genuinely bespoke enough that forcing it into Connect's connector model would be awkward.
 
 > [!question]- Why does a KTable need a changelog topic if it's just "current state"?
 > Because the KTable's state lives in a local, in-process store (RocksDB) for fast access — if that process crashes, the local store is gone. The changelog topic is what makes that state durable and recoverable: Kafka (the log) is always the source of truth, and the local store is rebuildable from it, never the other way around.

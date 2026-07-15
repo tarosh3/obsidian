@@ -70,9 +70,43 @@ A consumer must explicitly **ack** a message after successfully processing it. I
 
 **Redelivery loops:** a consistently-crashing consumer can cause the same message to be redelivered indefinitely (nack → requeue → redeliver → crash again). Mitigated by routing to a dead-letter exchange after a bounded number of redelivery attempts, rather than looping forever.
 
+## 8. Scaling: 1 queue to a high-volume, multi-consumer fleet
+
+```mermaid
+flowchart TD
+    A["1 queue/exchange<br/>trivial"] --> B["Growing volume<br/>competing consumers scale<br/>processing; more queues/exchanges<br/>for routing complexity"]
+    B --> C["High volume<br/>in-memory queue growth becomes<br/>a real memory-pressure risk"]
+    C --> D["Massive scale<br/>per-message ack bookkeeping and<br/>push delivery hit a ceiling well<br/>before Kafka's pull/offset model would"]
+```
+
+> [!info] The real, concrete reason very-high-throughput systems reach for Kafka instead
+> RabbitMQ's per-message, broker-side acknowledgment tracking (Section 5) is genuinely more bookkeeping-heavy per message than Kafka's single offset-per-consumer-group-per-partition model. This isn't a vague "Kafka is faster" claim — it's the direct, structural reason RabbitMQ's practical throughput ceiling sits meaningfully below Kafka's, and exactly why the decision framework in Section 6 points high-throughput, high-retention workloads toward Kafka specifically.
+
+## 9. Failure scenarios
+
+> [!bug] What actually happens
+> - **A queue's node crashes:** message loss unless **quorum queues** are configured — a real, named RabbitMQ reliability feature that replicates a queue's contents across nodes using **Raft** internally, tying directly to [[CS Fundamentals/06 - Distributed Systems/Consensus (Raft & Paxos)|the Consensus chapter]] already covered. Without quorum/mirrored queues, a single node's crash genuinely loses whatever messages it held.
+> - **A redelivery loop from a consistently-crashing consumer:** covered in Section 7 — nack/requeue/redeliver/crash repeating indefinitely unless a dead-letter exchange with a bounded retry count intervenes.
+> - **Unbounded in-memory queue growth from a slow consumer:** covered in Section 7 — real memory pressure on the broker, mitigated by lazy queues (paging to disk) at some throughput cost.
+
+## 10. Monitoring
+
+> [!info] What to watch
+> **Queue depth** — the direct, first-line signal that consumers are falling behind producers. **Consumer ack rate / unacked message count** — a growing unacked count signals consumers are either slow or crash-looping before acking. **Memory usage per node** — given RabbitMQ's default in-memory queue behavior, this is a leading indicator before the broker itself comes under real pressure.
+
+## 11. Common mistakes
+
+> [!warning] Real, recurring errors
+> 1. **Not configuring quorum/mirrored queues for critical queues** — accepting silent data-loss risk on a single node failure without realizing it.
+> 2. **Acking too early, before side effects fully complete** — Section 7's real failure mode; ack should follow successful completion of the actual work, not precede it.
+> 3. **Not setting a bounded redelivery count before dead-lettering** — Section 7's redelivery-loop risk, easily prevented but easy to overlook at initial setup.
+
 ---
 
 ## 🎯 Interview follow-up Q&A
+
+> [!info] Leveled by seniority
+> **Beginner:** "What's the producer-exchange-queue-consumer flow?" — producers never publish directly to queues; an exchange routes to queues based on bindings. **Intermediate:** "How does RabbitMQ achieve at-least-once delivery?" — Section 5's ack/requeue mechanism. **Senior:** "A queue's depth is climbing steadily during normal traffic — diagnose it." — expects checking consumer ack rate and per-consumer processing time first, distinguishing "consumers are too slow" from "producers suddenly increased" as genuinely different root causes. **Staff:** "Design the reliability configuration for a queue carrying financial transaction events that cannot be lost." — expects quorum queues named explicitly, plus a considered ack strategy (ack only after the side effect is durably complete) and a dead-letter policy for poison messages. **Architect:** "A system currently on RabbitMQ needs to add a new use case requiring months of message replay — how do you approach it?" — expects recognizing this is fighting RabbitMQ's design (Section 6's closing point) and either introducing Kafka alongside RabbitMQ for this specific need, or migrating that use case entirely, rather than forcing RabbitMQ to do something it wasn't built for.
 
 > [!quote]- "Explain the producer-exchange-queue-consumer model."
 > Producers publish to an exchange, never directly to a queue. The exchange applies routing rules (based on its type and configured bindings) to decide which queue(s) actually receive the message. Consumers attach to queues, not exchanges.
