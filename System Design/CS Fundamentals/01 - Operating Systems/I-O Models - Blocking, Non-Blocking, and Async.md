@@ -73,9 +73,43 @@ A thread-per-connection (blocking) model doesn't have this specific failure mode
 > [!info] Direct connections to chapters already written
 > [[CS Fundamentals/04 - Caching/Redis Internals|Redis Internals]]'s single-threaded model is this exact `epoll`-driven event loop, applied to a key-value store. [[CS Fundamentals/02 - Networking/TCP Deep Dive|TCP Deep Dive]]'s socket-level discussion assumes this I/O model underneath. [[CS Fundamentals/05 - Messaging & Streaming/Kafka Internals|Kafka's]] efficient handling of many concurrent producer/consumer connections relies on the same non-blocking I/O foundation.
 
+## Scaling: 1 connection to hundreds of thousands, across many machines
+
+```mermaid
+flowchart TD
+    A["1 connection<br/>any model works"] --> B["Hundreds of connections<br/>thread-per-connection still fine"]
+    B --> C["Thousands of connections<br/>the C10K problem —<br/>need multiplexing"]
+    C --> D["Hundreds of thousands+<br/>epoll essential,<br/>io_uring for the extreme tail"]
+    D --> E["Massive, multi-machine scale<br/>a load balancer distributes<br/>connections so no single<br/>machine handles unbounded count alone"]
+```
+
+At the largest scale, this stops being purely a single-machine I/O-model problem — [[CS Fundamentals/02 - Networking/Load Balancing|load balancing]] exists partly to ensure no individual machine ever needs to hold more connections than its own `epoll`/`io_uring` setup can comfortably serve, spreading the C10K-and-beyond problem horizontally across many machines rather than trying to push one machine's vertical ceiling ever higher.
+
+## Failure scenarios
+
+> [!bug] What actually happens
+> - **A CPU-bound task blocks the event loop:** covered above — in production, this shows up as a **sudden, simultaneous** latency spike across every concurrent connection at once, a distinctive signature worth recognizing quickly rather than investigating each slow request as if they were independent.
+> - **File-descriptor exhaustion:** a real, easy-to-overlook OS-level limit (`ulimit`) that can be hit *before* any of this chapter's algorithmic models even become relevant — a server correctly using `epoll` can still fail to accept new connections if the process's file-descriptor limit is configured too low for the actual connection count.
+> - **A slow or misbehaving client holding a connection open indefinitely:** a real resource-exhaustion pattern (the "Slowloris" attack is the well-known named example) — worth knowing that non-blocking I/O alone doesn't prevent a connection from being held open maliciously or accidentally forever without an additional idle-timeout mechanism.
+
+## Monitoring
+
+> [!info] What to watch
+> **Active connection count vs. file-descriptor limit** — the direct precursor signal before new connections start being rejected. **Event-loop lag** — the time between an event becoming ready and actually being processed; the direct, measurable signal of the CPU-bound-blocking failure mode. **Per-connection idle time** — the tool for detecting stuck or maliciously-held-open connections before they accumulate into a real resource problem.
+
+## Common mistakes
+
+> [!warning] Real, recurring errors
+> 1. **Running CPU-heavy work on the event-loop thread** — the Tradeoffs section's sharp failure mode, worth repeating as the single most common mistake with this architecture.
+> 2. **Not setting file-descriptor limits appropriately for expected connection count** — a correctly-implemented `epoll` server still fails if the OS-level limit is left at a small default.
+> 3. **Assuming "async" automatically means "fast"** — a single slow *synchronous* call embedded anywhere in an otherwise-async codepath still blocks that event loop for its full duration; async is a structural property of the whole path, not something a single call can opt into partially.
+
 ---
 
 ## Interview Q&A
+
+> [!info] Leveled by seniority
+> **Beginner:** "What's the difference between blocking and non-blocking I/O?" — blocking waits, non-blocking returns immediately and requires polling or a notification mechanism. **Intermediate:** "Why does `epoll` scale better than `select`/`poll`?" — Section on the O(1) amortized vs. O(N) scan distinction. **Senior:** "All connections to a single-threaded event-loop server suddenly became slow simultaneously — diagnose it." — expects recognizing the CPU-bound-blocking signature immediately, per Failure Scenarios, rather than investigating individual slow requests. **Staff:** "Design the connection-handling architecture for a service expecting extremely high connection churn (many short-lived connections) rather than long-lived ones." — expects reasoning about whether `epoll`'s per-readiness-check overhead or `io_uring`'s batched-syscall model fits better, given churn (not just peak concurrent count) is the dominant cost driver here. **Architect:** "How would connection-handling strategy differ between a service with 100K long-lived WebSocket connections vs. one with 100K short, high-frequency HTTP requests?" — expects recognizing these stress genuinely different things: the WebSocket case stresses concurrent-connection-holding capacity (epoll's core strength), while the HTTP case stresses request-processing throughput and connection churn, potentially favoring different tuning even under the same nominal "100K" number.
 
 > [!question]- Why is `epoll` faster than `select`/`poll` at high connection counts, precisely?
 > `select`/`poll` require the kernel to re-scan the *entire* list of monitored file descriptors on every single call, even if only one connection out of ten thousand has new data — an `O(N)` cost paid repeatedly. `epoll` maintains the interest list persistently inside the kernel and only returns the specific descriptors that became ready — the application never pays for scanning the idle majority.

@@ -77,9 +77,42 @@ A **preemptive** scheduler can forcibly interrupt a running thread (via a timer 
 
 **CPU-bound parallel work in Python**: CPython's Global Interpreter Lock (GIL) means only one thread executes Python bytecode at a time, *regardless of core count* — threads help with I/O-bound concurrency (waiting frees the GIL) but give **zero** speedup for CPU-bound work. The fix is multiprocessing (separate processes, separate GILs, real parallelism), not more threads — a genuinely common "when NOT to use threads" interview trap.
 
+## 7. Scaling: 1 thread to thousands
+
+```mermaid
+flowchart TD
+    A["1 thread<br/>no switching overhead at all"] --> B["A handful of threads<br/>context-switch overhead<br/>negligible"]
+    B --> C["Thousands of threads<br/>switch overhead AND memory<br/>(thread stacks) become real costs —<br/>the exact C10K problem"]
+    C --> D["Many-core machines<br/>at high thread counts, CONTENTION<br/>on shared data structures becomes<br/>the bottleneck, not switching itself"]
+```
+
+At thread counts in the thousands, both the memory cost (each thread's stack, typically 1-8MB) and the accumulated context-switch overhead become real, measurable costs — precisely the motivation behind [[CS Fundamentals/01 - Operating Systems/I-O Models - Blocking, Non-Blocking, and Async|the I/O Models chapter's]] event-loop alternative. On many-core machines specifically, once thread count is high enough to keep every core busy, the bottleneck often shifts away from switching cost entirely and toward **contention** — many threads competing for the same locks or shared data structures, a genuinely different problem than switching overhead, requiring different fixes (finer-grained locking, lock-free structures, or reducing shared mutable state).
+
+## 8. Failure scenarios
+
+> [!bug] What actually happens
+> - **A thread crashes:** takes down the **entire process**, since all threads share one address space — a single bad pointer dereference in one thread can corrupt or crash everything, unlike a process crash which stays isolated to that process alone. This is a real, meaningful reason to choose multi-process over multi-threaded for fault containment (Section 6).
+> - **A deadlock between threads:** two threads each hold a lock the other needs — the process hangs rather than crashing, often requiring a hung-process investigation (thread dumps, stack traces) to diagnose, since there's no crash log pointing directly at the cause.
+> - **A thread leak:** threads spawned but never cleaned up accumulate over time, eventually exhausting the OS's thread limit for the process — a slow-building failure that can look like an unrelated resource exhaustion until traced back to its actual source.
+
+## 9. Monitoring
+
+> [!info] What to watch
+> **Thread count per process** — a steadily climbing count with no corresponding load increase is the direct signal of a thread leak. **Context-switch rate** — a high rate relative to available cores signals oversubscription (more runnable threads than cores can service concurrently). **CPU time per thread** — the direct tool for identifying one runaway thread consuming disproportionate CPU among many.
+
+## 10. Common mistakes
+
+> [!warning] Real, recurring errors
+> 1. **Spawning a thread per request with no bound** — under load, this becomes an accidental self-inflicted resource-exhaustion event, since nothing caps how many threads can pile up.
+> 2. **Using threads for CPU-bound parallelism in CPython without accounting for the GIL** — Section 6 covers this precisely; threads help I/O-bound concurrency, not CPU-bound work, in CPython specifically.
+> 3. **Not using a thread pool** — paying full thread-creation cost repeatedly instead of reusing a bounded set of already-created threads, a real, avoidable overhead under any nontrivial request volume.
+
 ---
 
 ## 🎯 Interview follow-up Q&A
+
+> [!info] Leveled by seniority
+> **Beginner:** "What's the difference between a process and a thread?" — Section 1-2: isolated address space vs. shared address space within one process. **Intermediate:** "Why is a thread switch cheaper than a process switch?" — Section 4, TLB/cache validity preserved within the same address space. **Senior:** "A production service is hanging with no crash log — how do you diagnose it?" — expects suspecting a deadlock (Section 8) and reaching for thread dumps/stack traces as the actual diagnostic tool, not assuming a crash that never happened. **Staff:** "Design the concurrency model for a service handling both many concurrent I/O-bound requests and occasional CPU-heavy background jobs." — expects an event-loop or thread-pool model for the I/O-bound majority (per I/O Models), with CPU-heavy work explicitly isolated onto separate worker threads/processes so it can't stall the request-handling path. **Architect:** "How would you decide between a multi-threaded and multi-process architecture for a new service handling untrusted third-party plugin code?" — expects Section 6's answer prioritized correctly: fault isolation from a genuinely untrusted component outweighs the IPC/memory overhead cost, favoring multi-process specifically for that reason.
 
 > [!quote]- "What's the actual difference between a process and a thread?"
 > A process has its own isolated virtual address space, enforced by the MMU; a thread shares its parent process's address space with all sibling threads, owning only its own stack and register state.

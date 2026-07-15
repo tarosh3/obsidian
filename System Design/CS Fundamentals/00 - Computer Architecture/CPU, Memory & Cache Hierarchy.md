@@ -127,9 +127,42 @@ There is no version of this hierarchy that isn't a tradeoff — a system with "i
 > - **Why the "latency numbers every engineer should know" question exists:** it's testing whether you have this chapter's mental model, not whether you memorized a table — [[00 - Start Here/100 System Design Interview Questions|100 System Design Interview Questions]].
 > - **Why minimizing network hops is a recurring theme across every HLD chapter:** a network call is the single slowest, most variable operation in the entire hierarchy — everything from caching strategy to service-mesh design is partly about avoiding unnecessary trips down to that tier.
 
+## 9. Scaling: how this reasoning compounds as system scale grows
+
+```mermaid
+flowchart TD
+    A["Low load<br/>everything is fast enough,<br/>cache reasoning invisible"] --> B["Moderate load<br/>cache hit rate starts mattering —<br/>working-set-fits-in-cache becomes real"]
+    B --> C["High load, many cores<br/>cache COHERENCY traffic between<br/>cores becomes real overhead (MESI)"]
+    C --> D["Massive distributed scale<br/>the SAME hierarchy reasoning recurses —<br/>'this machine's RAM' vs 'a remote<br/>machine's RAM' is the new fast/slow boundary"]
+```
+
+At the largest scale, this chapter's entire mental model doesn't stop applying — it **recurses**. The gap between "data on this machine" and "data on a remote machine, fetched over the network" is structurally the exact same shape as the gap between "data in cache" and "data in RAM," just with far larger absolute numbers. Distributed caching, sharding for data locality, and CDN edge placement are all, underneath, the same "keep frequently-needed data as close as possible" principle from Section 3, applied one or more levels up the hierarchy.
+
+## 10. Failure scenarios
+
+> [!bug] Hardware-level failures worth knowing by name
+> - **Bit flips in RAM:** rare but real (cosmic rays, electrical noise) — **ECC (Error-Correcting Code) memory**, used in most servers, detects and corrects single-bit errors automatically, a real, named hardware-reliability mechanism most engineers never think about until asked.
+> - **Cache coherency bugs across cores:** when multiple CPU cores each cache their own copy of the same memory location, the **MESI protocol** (Modified/Exclusive/Shared/Invalid states) keeps those copies consistent — a genuinely deep topic, worth naming precisely if a multi-core correctness question comes up, rather than assuming caches "just work" transparently across cores.
+> - **A disk/SSD failure:** data loss unless redundancy exists at a higher layer entirely (RAID, database replication) — this chapter's hierarchy has no answer to physical media failure; that's a different concern, solved by the replication reasoning covered throughout the Distributed Systems tier.
+
+## 11. Monitoring
+
+> [!info] What to watch
+> **Cache hit rate** (measurable via tools like `perf` on Linux) — the direct signal for whether a workload's access pattern is exploiting locality well. **Page fault rate** — ties directly to [[CS Fundamentals/01 - Operating Systems/Memory Management & Virtual Memory|the Memory Management chapter]]; a rising rate signals memory pressure. **CPU utilization vs. memory-bound wait time** — a genuinely valuable distinction: "CPU is busy computing" and "CPU is stalled waiting on memory" look similar in naive utilization metrics but point to completely different fixes.
+
+## 12. Common mistakes
+
+> [!warning] Real, recurring errors
+> 1. **Assuming Big-O alone determines real-world performance** — Section "Two algorithms are both O(n)" already covers this precisely.
+> 2. **Writing cache-hostile code without considering locality** — heavy pointer-chasing data structures (linked lists, trees of individually-heap-allocated nodes) when a contiguous array-backed structure would serve the same purpose with far better cache behavior.
+> 3. **Ignoring NUMA effects on multi-socket machines** — on a machine with multiple CPU sockets, memory physically attached to a *different* socket than the accessing core is measurably slower to reach than local memory — a real, advanced consideration for high-performance systems that's easy to overlook entirely.
+
 ---
 
 ## Interview Q&A
+
+> [!info] Leveled by seniority
+> **Beginner:** "What's the difference between RAM and disk?" — RAM is fast and volatile, disk is slow and persistent, per the hierarchy. **Intermediate:** "Why does an array outperform a linked list for iteration despite equal Big-O?" — Section on spatial locality and cache lines. **Senior:** "A service's CPU utilization looks low but throughput is still poor — what would you check?" — expects checking memory-bound wait time (cache misses, page faults) rather than assuming low CPU usage means the CPU isn't the bottleneck at all. **Staff:** "Design a data layout for a hot-path struct accessed millions of times per second across multiple threads." — expects discussion of both cache-line-friendly layout (Section 5) and false sharing (independent fields from different threads happening to share a cache line, causing unnecessary coherency traffic) as a genuinely advanced follow-up. **Architect:** "How does this chapter's memory-hierarchy reasoning apply when designing a globally-distributed system, not just one machine?" — expects the Section 9 answer: the exact same locality principle recurses at the distributed-systems level, connecting hardware reasoning directly to caching/sharding/CDN design decisions made throughout the rest of this handbook.
 
 > [!question]- Why is a network call to another data center roughly a million times slower than a memory access, not just "a bit slower"?
 > Because it's not one slow step — it's the compounding of physical distance (speed-of-light propagation delay, unavoidable no matter how good the engineering), multiple hops through routers/switches, and OS-level networking stack overhead, stacked on top of an already-100x-slower-than-cache RAM access at each endpoint. The gap is multiplicative across several genuinely different bottlenecks, not additive over one.

@@ -76,9 +76,40 @@ Adding a reverse proxy adds a network hop (real, if usually small, latency cost)
 
 Nginx, HAProxy, and Envoy are the standard real-world reverse-proxy implementations — often serving static assets directly from the proxy layer (never even reaching a backend for a cached, unchanging file), a real, common performance optimization worth naming.
 
+## Scaling: 1 backend to global deployment
+
+```mermaid
+flowchart TD
+    A["1 backend<br/>no reverse proxy needed"] --> B["A few backends<br/>single reverse-proxy<br/>instance is fine"]
+    B --> C["Many backends, high traffic<br/>the proxy itself needs<br/>redundancy — the SPOF<br/>warning above, made concrete"]
+    C --> D["Global scale<br/>reverse proxies deployed<br/>PER REGION, combined with<br/>geographic routing (Load Balancing/CDN)"]
+```
+
+## Failure scenarios
+
+> [!bug] What actually happens
+> - **The reverse proxy instance itself crashes:** every backend behind it becomes unreachable, **even though those backends are perfectly healthy** — the exact SPOF risk already named, made concrete: the failure is entirely at the proxy layer, invisible to any backend-level health check.
+> - **A misconfigured routing rule:** traffic gets silently sent to the wrong backend, or dropped entirely — a real, often slow-to-detect class of incident, since the individual services involved may show no errors of their own at all.
+> - **TLS certificate expiry at the proxy:** since TLS termination is centralized (the exact benefit named in "why this exists"), a single expired certificate can take down access to *every* backend behind that proxy simultaneously — a real, deliberate consequence of the same centralization that reduces day-to-day cert-management effort.
+
+## Monitoring
+
+> [!info] What to watch
+> **Proxy-added latency** — every request pays this overhead, making it a direct, always-relevant metric. **Backend health status as seen by the proxy** — the proxy's own view of backend health, which can diverge from what the backend believes about itself during a routing misconfiguration. **TLS certificate expiry date** — a simple, often-overlooked monitoring gap given the outsized blast radius of missing a renewal at this centralized layer.
+
+## Common mistakes
+
+> [!warning] Real, recurring errors
+> 1. **Running a single reverse-proxy instance with no redundancy** — the SPOF risk named throughout this chapter.
+> 2. **Not monitoring certificate expiry centrally** — the same centralization that simplifies cert management also means a missed renewal has a larger blast radius than it would per-backend.
+> 3. **Overloading the reverse proxy with business logic** — the same "gateway becomes a monolith" anti-pattern named in the [[CS Fundamentals/02 - Networking/API Gateway|API Gateway chapter]] applies here too, since a reverse proxy is the more general case that gateway specializes.
+
 ---
 
 ## Interview Q&A
+
+> [!info] Leveled by seniority
+> **Beginner:** "What does a reverse proxy do?" — forwards client requests to backend servers on their behalf, hiding backend topology from clients. **Intermediate:** "What's the difference between a forward proxy and a reverse proxy?" — Section 2's precise distinction: which side of the conversation is being hidden. **Senior:** "Every backend behind a reverse proxy is reporting healthy, but users report the whole site is down — diagnose it." — expects checking the proxy layer itself first (Failure Scenarios), since backend-level health checks can't detect a proxy-layer failure. **Staff:** "Design certificate management for a fleet of reverse proxies across multiple regions." — expects centralized, automated renewal (not per-instance manual management) precisely because of the outsized blast radius named above, plus monitoring expiry dates as a first-class metric. **Architect:** "How would you decide whether a system needs a dedicated reverse proxy layer versus relying purely on a service mesh for internal routing?" — expects the north-south vs. east-west distinction from the API Gateway chapter, applied generally: a reverse proxy for external-facing traffic, a mesh for internal service-to-service traffic, often both present simultaneously rather than one replacing the other.
 
 > [!question]- Is a CDN edge node a reverse proxy?
 > Functionally, yes — a CDN edge server receives client requests and either serves a cached response directly or forwards to origin on the client's behalf, exactly the reverse-proxy shape, specialized further for geographic distribution and caching. Worth naming this overlap explicitly if asked — see [[CS Fundamentals/02 - Networking/CDN Internals|CDN Internals]].

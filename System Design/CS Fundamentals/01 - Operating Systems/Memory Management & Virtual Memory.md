@@ -100,9 +100,43 @@ Pages are loaded **lazily** — only when actually accessed, not all at once whe
 > - **The Linux OOM killer:** when physical RAM *and* swap are both exhausted, the kernel has no page to evict to make room — it must forcibly terminate a process, chosen by a heuristic ("OOM score"), to reclaim memory. Production incidents where a process mysteriously dies under memory pressure are usually this.
 > - **Container memory limits (cgroups):** the mechanism [[CS Fundamentals/00 - Learning Path|the future Docker/Kubernetes chapters]] will build on — a container's memory limit is enforced at exactly this layer, and exceeding it triggers the same OOM-kill mechanism, scoped to the container.
 
+## Scaling: 1 process to memory-constrained global deployment
+
+```mermaid
+flowchart TD
+    A["1 process<br/>simple, plenty of memory"] --> B["Many processes,<br/>one machine<br/>memory becomes contended,<br/>shared page cache pressure"]
+    B --> C["Memory-constrained containers<br/>tight cgroups memory limits —<br/>direct tie to Docker Fundamentals"]
+    D["Massive scale<br/>working-set-size PER MACHINE<br/>becomes the design constraint —<br/>sharding keeps it small enough<br/>to avoid thrashing"]
+    C --> D
+```
+
+At container scale, memory limits are enforced via cgroups (per [[CS Fundamentals/07 - Architecture and Deployment Patterns/Docker Fundamentals|Docker Fundamentals]]) — the exact same OOM-kill mechanism from this chapter, just scoped to a container instead of a whole machine. At true large scale, "memory management" stops being a single-machine concern and becomes a data-placement concern: [[CS Fundamentals/06 - Distributed Systems/Sharding & Partitioning|sharding]] exists partly to keep each machine's actual working set small enough to stay comfortably resident in RAM, avoiding the thrashing this chapter describes at a system-design level rather than a single-process level.
+
+## Failure scenarios
+
+> [!bug] What actually happens
+> - **OOM kill:** covered above — the kernel forcibly terminates a process when RAM and swap are both exhausted, chosen via an OOM-score heuristic.
+> - **Swap thrashing under memory pressure:** covered above — constant major page faults turning "memory access" into "disk access" repeatedly, a catastrophic rather than proportional slowdown.
+> - **A memory leak:** gradual, creeping growth that eventually triggers an OOM kill — a genuinely different *failure pattern* than a sudden spike, since it can take hours or days to manifest and is often misdiagnosed as unrelated performance degradation before the eventual crash makes the cause obvious in hindsight.
+
+## Monitoring
+
+> [!info] What to watch
+> **Memory usage vs. configured limit** — the direct precursor signal before an OOM kill happens, ideally caught and alerted on well before the limit is reached. **Page fault rate, major vs. minor** — a rising major-fault rate is the leading indicator of thrashing beginning, before it's severe enough to be obvious from throughput alone. **Swap usage** — on a healthy production server this should be near-zero; any nonzero swap usage is often itself worth alerting on, not just a background curiosity.
+
+## Common mistakes
+
+> [!warning] Real, recurring errors
+> 1. **Not setting memory limits on containers** — allows one container to consume enough memory to starve others sharing the same host, a real, avoidable "noisy neighbor" problem.
+> 2. **Confusing normal page-cache growth with a memory leak** — the OS *should* use available RAM for page cache; that memory being "used" isn't a leak, and reclaiming it under pressure is exactly what the OS does automatically. Treating healthy cache growth as an alarm is a common false-positive mistake.
+> 3. **Assuming more RAM always fixes a memory problem** — without first diagnosing whether it's a genuine leak (which more RAM only delays, not fixes) vs. legitimate working-set growth (which more RAM does fix), you risk masking a real bug rather than resolving it.
+
 ---
 
 ## Interview Q&A
+
+> [!info] Leveled by seniority
+> **Beginner:** "What is virtual memory?" — the illusion each process has its own private address space, translated to physical RAM by the OS/MMU. **Intermediate:** "Why is `fork()` cheap despite copying a whole process?" — copy-on-write, above. **Senior:** "A production host's latency degraded sharply with no traffic change — what would you check?" — expects checking swap usage and major-page-fault rate first, recognizing thrashing as a likely cause of a sudden, non-proportional slowdown. **Staff:** "Design memory limits and eviction policy for a multi-tenant host running several containerized services with different memory needs." — expects per-container cgroups limits sized deliberately (not left default), with explicit reasoning about what should happen when a container approaches its limit (OOM-kill that container specifically, not let it starve neighbors). **Architect:** "How does memory management reasoning change when a service moves from a single large machine to many smaller sharded machines?" — expects the Scaling section's answer: working-set-size-per-machine becomes the design lever, and sharding is partly a memory-management decision, not purely a throughput one.
 
 > [!question]- Why does a page fault sometimes cost nanoseconds and sometimes milliseconds?
 > Depends entirely on whether the page needs to come from disk. A "minor" page fault (page exists in RAM already, just needs a page-table entry updated — e.g., a freshly `mmap`'d region) is cheap. A "major" page fault (page must be read from disk/swap) pays full disk-tier latency — the same order of magnitude as any other disk access from the Computer Architecture chapter's latency table.
