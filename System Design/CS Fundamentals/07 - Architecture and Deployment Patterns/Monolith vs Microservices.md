@@ -81,9 +81,46 @@ A monolith's components talk via **in-process function calls** — fast, and tra
 > [!success] You've already been doing microservices-style thinking, one chapter at a time
 > Nearly every [[00 - Start Here/How This Handbook Works|HLD chapter]] in this handbook designs *one* focused service — a rate limiter, a notification service, a payment system — exactly the microservices decomposition mindset, without ever naming it explicitly until now. [[HLD/23 - Design an E-commerce System/Design an E-commerce System|The E-commerce chapter's]] checkout saga exists specifically *because* inventory, payment, and order data live in separate services/databases — a direct, concrete instance of the "data consistency is hard" row in the table above. [[CS Fundamentals/06 - Distributed Systems/Service Discovery|Service Discovery]] is infrastructure that only becomes necessary once you've split into microservices — a monolith never needs to "discover" itself.
 
+## Scaling: monolith to (sometimes back toward) fewer, larger services
+
+```mermaid
+flowchart TD
+    A["Small team,<br/>early product<br/>monolith, per this<br/>chapter's own guidance"] --> B["Growing team,<br/>clear domain boundaries emerging<br/>extract candidate services ONE<br/>AT A TIME — the 'strangler fig' pattern"]
+    B --> C["Many teams, many services<br/>full microservices, needing<br/>Service Discovery/API Gateway/<br/>observability infrastructure"]
+    C --> D["Very large scale<br/>some orgs deliberately CONSOLIDATE<br/>toward fewer, larger 'macroservices' once<br/>fine-grained overhead outweighs autonomy benefit"]
+```
+
+> [!tip] The "strangler fig" pattern — the real, incremental migration path
+> Rather than a risky big-bang rewrite, services are carved out of a monolith one at a time, starting with the clearest, most independent boundary — the monolith keeps running throughout, gradually shrinking as functionality moves out, until (if ever) nothing is left in it. Worth naming by name — a strong, specific answer to "how would you migrate a monolith," rather than a vague "break it into services."
+
+> [!info] The real counter-trend, worth knowing
+> Some organizations at very large scale deliberately move *back* toward fewer, larger services ("macroservices") once the operational overhead of very fine-grained microservices (too many deploy pipelines, too much cross-service coordination for routine changes) outweighs the team-autonomy benefit that motivated the original split — a genuine, documented industry pattern, not a sign microservices were a mistake, but a sign that granularity itself has a tunable, revisitable sweet spot.
+
+## Failure scenarios
+
+> [!bug] What actually happens
+> - **A monolith's single deploy fails:** the *entire* application goes down — a sharp, wide blast radius, the direct cost side of the simplicity benefit.
+> - **One microservice fails:** blast radius contained to that service and its direct callers, *assuming* [[CS Fundamentals/06 - Distributed Systems/Resilience Patterns|resilience patterns]] are actually in place — without them, a failing service's callers can cascade into failure too, losing much of the intended isolation benefit.
+> - **A poorly-drawn service boundary causes a distributed-monolith cascading failure:** a single feature change requires coordinated deploys across multiple "independent" services — the exact anti-pattern named above, now manifesting as an actual incident rather than just slower development.
+
+## Monitoring
+
+> [!info] What to watch
+> **Per-service deploy frequency and failure rate** — detects which services are becoming velocity bottlenecks for their owning teams. **Cross-service call volume/latency** — unexpectedly high call volume between two supposedly-independent services is a direct signal of a boundary problem, not just a performance one. **Distributed tracing coverage** — essential once microservices are adopted at all; per [[CS Fundamentals/09 - Operational Excellence/Observability - Metrics, Logs and Traces|Observability]], a request spanning services is genuinely hard to debug without it.
+
+## Common mistakes
+
+> [!warning] Real, recurring errors
+> 1. **Adopting microservices prematurely** — the "Distributed Monolith" section above, the chapter's central warning.
+> 2. **Drawing service boundaries around technical layers instead of business capabilities** — a real, specific version of the boundary-drawing mistake, covered in the Interview Q&A below.
+> 3. **Not investing in observability/tracing infrastructure *before* splitting into microservices** — a real, common sequencing mistake: teams migrate first and only then discover they can no longer debug a request that spans multiple services.
+
 ---
 
 ## Interview Q&A
+
+> [!info] Leveled by seniority
+> **Beginner:** "What's the main tradeoff between a monolith and microservices?" — deployment/scaling simplicity vs. team autonomy and independent scaling, at the cost of operational and consistency complexity. **Intermediate:** "What is a 'distributed monolith' and how do you avoid it?" — the anti-pattern above; avoid it by drawing boundaries around business capabilities, not technical layers. **Senior:** "A team's microservices migration made deploys slower, not faster — diagnose it." — expects checking whether service boundaries actually align with team ownership and independent change patterns, or whether it's a distributed monolith in practice despite being physically split. **Staff:** "Design a migration plan to extract a monolith's checkout functionality into an independent service with zero downtime." — expects the strangler-fig pattern named explicitly: run both paths temporarily, incrementally shift traffic, decommission the old path only once the new one is proven. **Architect:** "A large organization's microservices architecture has grown to 400 services and velocity has started declining — what would you investigate?" — expects considering the macroservices counter-trend from the Scaling section: whether granularity has overshot the point of net benefit, and whether consolidating some closely-coupled services would reduce coordination overhead without meaningfully losing autonomy where it actually matters.
 
 > [!question]- When would you recommend a company stay with a monolith rather than migrating to microservices?
 > When the team is small enough that coordination overhead isn't yet a real problem, when the product's domain boundaries are still actively changing (splitting into services locks in boundaries that are expensive to redraw later), or when there's no genuine need to scale different parts of the system independently. Migrating early trades a real, present cost (network calls, operational complexity) for a benefit (independent team scaling) the org doesn't need yet.

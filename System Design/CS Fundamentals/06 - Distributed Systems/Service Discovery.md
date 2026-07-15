@@ -117,9 +117,41 @@ sequenceDiagram
 > 2. **Deregister gracefully on shutdown** — don't rely purely on heartbeat timeout to remove a deliberately-stopping instance; that window of "registered but already gone" is exactly where requests fail.
 > 3. **Cache lookups with a short TTL** — querying the registry on every single request would make the registry itself the bottleneck; a brief client-side cache absorbs the load while staying reasonably fresh.
 
+## Scaling: a few services to global, multi-region
+
+```mermaid
+flowchart TD
+    A["Few services<br/>a simple registry, even<br/>static config, may suffice"] --> B["Growing services<br/>a real registry becomes<br/>necessary; heartbeat tuning matters"]
+    B --> C["Massive scale<br/>the REGISTRY ITSELF must be<br/>sharded/clustered — a distributed<br/>system needing its own consensus"]
+    D["Multi-region<br/>registries deployed PER REGION<br/>with cross-region awareness, avoiding<br/>a single global registry as a<br/>latency bottleneck for every lookup"]
+    C --> D
+```
+
+## Failure scenarios
+
+> [!bug] What actually happens
+> - **The registry itself goes down:** already covered above — production registries are themselves consensus-backed clusters specifically to avoid being a single point of failure for every service-to-service call system-wide; clients also cache the last-known-good list, so a brief outage stops *updates*, not all traffic immediately.
+> - **A registry entry goes stale between heartbeats:** a request can briefly hit a now-dead instance — discovery narrows this window but structurally cannot eliminate it entirely, which is exactly why [[CS Fundamentals/06 - Distributed Systems/Resilience Patterns|Resilience Patterns]] (circuit breaker/retry) remain necessary even with discovery in place.
+> - **A network partition between a client and the registry:** the client falls back to its last-cached instance list rather than failing every call outright — a real, deliberate resilience choice, not an oversight.
+
+## Monitoring
+
+> [!info] What to watch
+> **Registry lookup latency** — directly affects every downstream call's total latency, given lookups sit on the critical path (or are cached specifically to get off it). **Percentage of stale/dead entries being served** — the direct tuning signal for whether heartbeat interval and timeout are well-calibrated. **Registration/deregistration event rate** — unusually high churn signals instability upstream (crash-looping instances, an overly aggressive autoscaler), not a registry problem itself.
+
+## Common mistakes
+
+> [!warning] Real, recurring errors
+> 1. **Not deregistering gracefully on shutdown** — the Key Takeaways section above; relying purely on heartbeat timeout leaves a real "registered but already gone" window.
+> 2. **Caching lookups for the wrong duration** — too long risks staleness, too short hammers the registry with redundant queries; this is a genuine tuning tradeoff, not a "set and forget" value.
+> 3. **Treating the registry as infallible without redundancy** — the exact failure mode the "what happens if the registry goes down" section addresses; a non-clustered registry recreates the single-point-of-failure problem discovery was meant to help avoid elsewhere in the system.
+
 ---
 
 ## Interview Q&A
+
+> [!info] Leveled by seniority
+> **Beginner:** "What problem does service discovery solve?" — finding a service instance's current address when instances constantly start, stop, and rescale. **Intermediate:** "Client-side vs. server-side discovery — what's the actual tradeoff?" — extra network hop vs. discovery-logic complexity living in every client. **Senior:** "Clients are intermittently calling dead service instances despite discovery being in place — diagnose it." — expects checking heartbeat interval/timeout tuning and client-side cache TTL, since some staleness window is structurally unavoidable and the question is whether it's tuned appropriately. **Staff:** "Design service discovery for a platform spanning 3 regions where cross-region calls should be avoided except during a regional failure." — expects per-region registries as the default, with an explicit, deliberate fallback path to another region's registry only when the local one is unavailable. **Architect:** "How would you evaluate whether a growing platform still needs dedicated service discovery infrastructure, or whether it's premature complexity?" — expects a real judgment call: static config remains viable until instance churn (autoscaling, frequent deploys) makes manual updates genuinely untenable, not a reflexive "always add a registry."
 
 > [!question]- Why does Kubernetes use server-side discovery by default?
 > Kubernetes Services provide a single, stable virtual IP/DNS name per service — `kube-proxy` handles routing to actual pod IPs behind the scenes, and the pod set changes constantly as pods are rescheduled. This keeps application code entirely ignorant of discovery — a pod just calls `payment-service` by name, and the platform handles the rest, which fits Kubernetes' broader goal of keeping application code portable across environments.

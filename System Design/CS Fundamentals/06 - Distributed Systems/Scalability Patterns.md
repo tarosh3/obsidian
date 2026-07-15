@@ -87,9 +87,31 @@ flowchart TD
 > [!success] This chapter is a map, not a destination
 > Every HLD chapter's Step 3-5 "building it incrementally" section is, in effect, applying one or more of these exact levers at the right moment — introduced only once the naive version's specific bottleneck is felt, never proactively "just in case." That incremental-introduction discipline *is* this chapter's diagnostic flow, applied narratively, chapter after chapter, throughout the rest of this handbook.
 
+## Failure scenarios — applying the wrong lever
+
+> [!bug] What actually goes wrong
+> - **Applying a fix to the wrong layer:** adding read replicas when the actual bottleneck is write-side saturation wastes real effort and doesn't touch the real problem — the diagnostic flow above exists specifically to prevent this.
+> - **Over-provisioning ahead of actual need:** premature horizontal scaling (or premature sharding) adds real, ongoing operational complexity and cost for traffic that hasn't materialized yet — the infrastructure-scaling instance of the same premature-optimization mistake [[CS Fundamentals/09 - Operational Excellence/Performance Engineering|Performance Engineering]] already names generally.
+> - **A scaling fix introducing a new bottleneck:** sharding fixes write throughput but can make previously-simple cross-shard queries slow — the classic "fixed one problem, created another" pattern, worth anticipating explicitly rather than treating each lever as a free win with no downstream cost.
+
+## Monitoring — the inputs the diagnostic flow actually needs
+
+> [!info] What to watch
+> **Per-layer utilization relative to its ceiling** — the direct input to "where's the actual bottleneck" in the diagnostic flow; without this, the flow can't actually be followed. **Traffic/data growth rate** — informs *when* a given lever will be needed, turning scaling from a reactive scramble into a planned decision with lead time.
+
+## Common mistakes
+
+> [!warning] Real, recurring errors
+> 1. **Scaling the wrong layer without measuring first** — the core warning of this entire chapter, worth repeating as the single most common mistake.
+> 2. **Over-provisioning ahead of actual need** — real cost and complexity for traffic that may never arrive.
+> 3. **Treating scaling as a one-time decision** rather than an ongoing practice — traffic and data-access patterns shift over time, and a lever that was right last year may not be the right one today.
+
 ---
 
 ## Interview Q&A
+
+> [!info] Leveled by seniority
+> **Beginner:** "What's the difference between scaling reads and scaling writes?" — reads scale via replicas/caching; writes need sharding since they must eventually reconcile. **Intermediate:** "Why can't you just add more database replicas to fix a write-throughput problem?" — replicas scale reads, not writes; every write still goes through the primary regardless of replica count. **Senior:** "A system scaled its app tier horizontally but latency didn't improve — diagnose it." — expects checking whether the app tier was ever actually the bottleneck, per the diagnostic flow, rather than assuming the fix simply didn't work. **Staff:** "A recently-sharded system now has slow cross-shard analytical queries that didn't exist before sharding — how do you address it?" — expects recognizing this as the "new bottleneck introduced" failure mode above, and proposing a genuinely separate solution (a read-optimized replica/warehouse for analytics) rather than trying to force the transactional sharding scheme to also serve analytical query patterns well. **Architect:** "How would you build a capacity-planning practice that applies this chapter's diagnostic flow proactively instead of reactively?" — expects discussion of tracking growth-rate trends (Monitoring above) against each layer's known ceiling, scheduling scaling work ahead of the point of actual saturation rather than firefighting after it's already a production incident.
 
 > [!question]- A system is slow under load — how do you decide which scaling pattern to apply?
 > Measure first — check CPU/memory on app servers, database read vs. write latency, queue depth, network — per [[CS Fundamentals/09 - Operational Excellence/Performance Engineering|Performance Engineering]]. The bottleneck's *location* determines the lever: app-tier CPU-bound means horizontal app scaling; DB reads saturating means replicas or caching; DB writes saturating means sharding. Applying a lever without first confirming where the actual bottleneck is is a common, avoidable mistake.

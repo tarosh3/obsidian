@@ -80,9 +80,43 @@ If the cluster splits into a minority and a majority side: the **majority side**
 
 They solve the identical problem and are provably equivalent in power — Raft's contribution is decomposing it into pieces engineers can actually reason about and implement correctly, which is exactly why it won in practice for new systems.
 
+## Scaling: cluster size is about fault tolerance, not throughput
+
+```mermaid
+flowchart TD
+    A["3-node cluster<br/>typical minimum,<br/>tolerates 1 failure"] --> B["5-node cluster<br/>tolerates 2 failures,<br/>more replication overhead per write"]
+    B --> C["Growing further<br/>DIMINISHING returns —<br/>larger majority needed per write,<br/>more coordination overhead"]
+    C --> D["Massive scale<br/>consensus coordinates METADATA/leadership,<br/>actual data throughput scales via a<br/>completely different mechanism (sharding)"]
+```
+
+> [!warning] A genuinely counterintuitive point worth stating precisely
+> Adding more nodes to a Raft cluster does **not** increase throughput — every write still needs acknowledgment from a majority, and a *larger* cluster means a *larger* majority is required, adding coordination overhead rather than removing it. Cluster size is sized purely for **fault tolerance** (how many simultaneous node failures can be survived), never for scaling write capacity. High-throughput systems never try to "scale Raft" for data throughput — they use consensus for a small amount of coordination (leadership, configuration, locks) while the actual data plane scales through [[CS Fundamentals/06 - Distributed Systems/Sharding & Partitioning|sharding]], an entirely separate mechanism.
+
+## Failure scenarios
+
+> [!bug] What actually happens, beyond the partition case already covered
+> - **A follower crashes:** no impact as long as the majority remains available — on rejoin, the recovering follower catches up via `AppendEntries` backfilling whatever it missed.
+> - **The leader crashes:** followers' election timeouts fire, a new election happens (Section on leader election) — a brief unavailability window for writes during the election itself, bounded by the election-timeout range.
+> - **More than half the cluster crashes simultaneously:** total unavailability for writes — the cluster correctly refuses to make progress rather than risk split-brain, the deliberate CP tradeoff already named under "What happens during a network partition."
+
+## Monitoring
+
+> [!info] What to watch
+> **Leader stability** — frequent re-elections signal an unstable leader (network flakiness, resource starvation), not normal operation. **Log replication lag per follower** — a consistently lagging follower is a candidate for investigation before it becomes the deciding factor in an availability incident. **Election frequency** — a genuinely important top-level health signal; a healthy cluster should have leader changes as a rare event, not a routine one.
+
+## Common mistakes
+
+> [!warning] Real, recurring errors
+> 1. **Running an even-sized cluster** (2, 4, 6 nodes) — provides *worse* fault tolerance per node than the next-smaller odd size, since majority math doesn't improve and a tie becomes possible; always size Raft/Paxos clusters with an odd node count.
+> 2. **Assuming more nodes means more throughput** — Section "Scaling" above; the opposite is closer to true.
+> 3. **Not accounting for the leader-election unavailability window in SLA calculations** — a real, bounded but nonzero gap that a naive "the cluster is always available" assumption misses.
+
 ---
 
 ## Interview Q&A
+
+> [!info] Leveled by seniority
+> **Beginner:** "What problem does consensus solve?" — getting multiple nodes to agree on a single value despite failures. **Intermediate:** "Why does Raft use randomized election timeouts?" — Section on leader election, preventing simultaneous candidacies and repeated split votes. **Senior:** "A Raft-backed service is experiencing frequent, brief unavailability windows — diagnose it." — expects checking election frequency first; frequent re-elections point to an unstable leader (network or resource issue), not a fundamental Raft problem. **Staff:** "Design the cluster sizing and deployment topology for a Raft-backed configuration store that must survive a single data-center failure." — expects reasoning about node placement across failure domains (not just node count), ensuring a majority can still form even if one entire data center is lost. **Architect:** "Why wouldn't you use Raft consensus directly as the data plane for a high-throughput key-value store?" — expects the Scaling section's answer: consensus overhead scales the wrong direction for throughput; real systems use consensus for coordination metadata while sharding handles actual data throughput.
 
 > [!question]- What happens if two nodes think they're leader at the same time?
 > Raft prevents this by term numbers — a node discovering a higher term than its own immediately steps down to follower. A stale leader that's been partitioned away will eventually rejoin, see a higher term in an `AppendEntries` or `RequestVote` from the real leader, and demote itself. Until it rejoins, it *can* still think it's leader — but it can never commit anything, since it can't reach a majority from the minority side it's stuck on.

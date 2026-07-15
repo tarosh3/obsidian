@@ -175,9 +175,43 @@ A single request touching Service A → B → C needs a **total** time budget, a
 > [!bug] The compounding-timeout bug
 > If A calls B with a 5s timeout, and B calls C with its *own* 5s timeout, A can end up waiting far longer than 5s in the worst case if B's internal retry/timeout logic runs before B itself gives up and returns to A. The fix: propagate a **deadline**, not a fixed duration, down the call chain (Go's `context.WithDeadline` is exactly this) — each hop computes its *remaining* budget from the shared deadline, so the total end-to-end time is bounded no matter how many hops are involved.
 
+## Scaling: 1 dependency to a full service mesh
+
+```mermaid
+flowchart TD
+    A["1 dependency<br/>resilience overhead<br/>barely worth it"] --> B["A few dependencies<br/>circuit breaker per<br/>dependency starts paying off"]
+    B --> C["Many dependencies /<br/>microservices<br/>bulkheads essential, per-hop<br/>timeout budgets necessary"]
+    D["Massive scale<br/>a SERVICE MESH implements these<br/>patterns UNIFORMLY across every<br/>call, instead of each service<br/>hand-rolling its own"]
+    C --> D
+```
+
+At large scale with many services, hand-implementing circuit breakers, retries, and bulkheads independently in every service becomes real duplicated effort and inconsistency risk — a service mesh (Istio/Envoy sidecars, the east-west traffic layer from [[CS Fundamentals/02 - Networking/API Gateway|the API Gateway chapter]]) applies these patterns uniformly at the infrastructure layer, so individual services don't need to reimplement them correctly each time.
+
+## Failure scenarios
+
+> [!bug] What actually happens, beyond a hard failure
+> - **A dependency degrades gradually rather than failing outright:** genuinely harder to detect than a clean failure — this is exactly why a circuit breaker tracks a **failure rate** over a window, not a simple binary up/down signal, catching creeping degradation before it becomes a full outage.
+> - **The circuit breaker itself is misconfigured:** too sensitive a threshold trips on normal transient blips (false positives, unnecessarily degrading availability); too lax a threshold fails to protect in time (the breaker exists but doesn't actually help) — real tuning work, not a set-once configuration.
+> - **A retry storm during a widespread outage:** even with jitter, if *every* service across a large system simultaneously starts retrying a shared dependency the moment it shows signs of recovery, the aggregate retry volume itself can re-crash it — a harder, system-wide version of the thundering-herd problem that sometimes needs coordinated backoff or rate limiting layered on top of per-caller jitter, not just jitter alone.
+
+## Monitoring
+
+> [!info] What to watch
+> **Circuit breaker state transitions** (Closed→Open events) — a direct, real-time dependency-health signal, often faster to notice than aggregate error-rate dashboards. **Retry rate and success-after-retry rate** — distinguishes "retries are helping" from "retries are just adding load to an already-struggling dependency." **Per-bulkhead resource utilization** — confirms dependency-specific pools are actually isolating load as designed, not silently sharing capacity somewhere upstream.
+
+## Common mistakes
+
+> [!warning] Real, recurring errors
+> 1. **Using default circuit-breaker thresholds without tuning to the actual dependency's failure characteristics** — a dependency with naturally spiky, brief error bursts needs a different threshold than one with a slow, steady degradation pattern.
+> 2. **Retrying non-idempotent operations without an idempotency key** — reintroduces the exact duplicate-side-effect risk [[Glossary/Idempotency|Idempotency]] and [[HLD/17 - Design a Payment System/Design a Payment System|the Payment System chapter]] already cover in depth.
+> 3. **Sharing one resource pool across all dependencies** — the exact motivation for bulkheads in the first place; skipping this reintroduces the single-dependency-starves-everything failure mode.
+
 ---
 
 ## Interview Q&A
+
+> [!info] Leveled by seniority
+> **Beginner:** "What does a circuit breaker do?" — stops calling a failing dependency after too many failures, failing fast instead of piling up timeouts. **Intermediate:** "Why does retry need jitter, not just exponential backoff?" — prevents synchronized retry waves from every caller re-hitting the dependency simultaneously. **Senior:** "A dependency recovered from an outage, but immediately went down again under the recovery traffic — diagnose it." — expects recognizing a retry-storm pattern (Failure Scenarios above), not assuming the dependency's fix didn't work. **Staff:** "Design the resilience strategy for a service with 15 downstream dependencies of varying criticality." — expects differentiated treatment: aggressive circuit breaking and generous bulkheads for non-critical dependencies (fail fast, degrade gracefully), more conservative handling for dependencies the request genuinely cannot succeed without. **Architect:** "How would you decide whether to hand-implement resilience patterns per-service versus adopting a service mesh?" — expects a real tradeoff: mesh adoption cost and operational complexity vs. consistency and reduced duplicated effort across many services — the right call shifting decisively toward mesh as service count grows, per the Scaling section.
 
 > [!question]- How do these four patterns compose together in one call?
 > Wrap the call in a circuit breaker (fail fast if the dependency is known-bad); inside that, retry with backoff+jitter for transient failures while the breaker is closed; the call itself runs against a bulkheaded resource pool scoped to that specific dependency; and the whole thing respects a deadline propagated from the original request, not a locally-invented timeout. Layering all four is standard in production resilience libraries (e.g. Netflix's Hystrix, or Go's `sony/gobreaker` + context deadlines).
