@@ -141,12 +141,12 @@ How you know a system is healthy, how you keep it healthy, and how you make it f
 
 | # | Chapter | Status |
 |---|---|---|
-| 10.1 | [[CS Fundamentals/10 - Design Principles/SOLID Principles\|SOLID Principles]] | ✅ |
-| 10.2 | [[CS Fundamentals/10 - Design Principles/Design Patterns Cheat Sheet\|Design Patterns Cheat Sheet]] (all 23 GoF patterns, recognition-level) | ✅ |
-| 10.3 | [[CS Fundamentals/10 - Design Principles/Creational Design Patterns - Full Code Deep Dive\|Creational Design Patterns]] (full before/after Go code) | ✅ |
-| 10.4 | [[CS Fundamentals/10 - Design Principles/Structural Design Patterns - Full Code Deep Dive\|Structural Design Patterns]] (full before/after Go code) | ✅ |
-| 10.5 | [[CS Fundamentals/10 - Design Principles/Behavioral Design Patterns - Full Code Deep Dive\|Behavioral Design Patterns]] (full before/after Go code) | ✅ |
-| 10.6 | [[CS Fundamentals/10 - Design Principles/Concurrency Patterns in Go\|Concurrency Patterns in Go]] (not GoF — Worker Pool, Pipeline, Fan-out/Fan-in, Context Cancellation, Pub-Sub) | ✅ |
+| 10.1 | [[CS Fundamentals/10 - Design Principles/01 - SOLID Principles\|SOLID Principles]] | ✅ |
+| 10.2 | [[CS Fundamentals/10 - Design Principles/02 - Design Patterns Cheat Sheet\|Design Patterns Cheat Sheet]] (all 23 GoF patterns, recognition-level) | ✅ |
+| 10.3 | [[CS Fundamentals/10 - Design Principles/03 - Creational Design Patterns - Full Code Deep Dive\|Creational Design Patterns]] (full before/after Go code) | ✅ |
+| 10.4 | [[CS Fundamentals/10 - Design Principles/04 - Structural Design Patterns - Full Code Deep Dive\|Structural Design Patterns]] (full before/after Go code) | ✅ |
+| 10.5 | [[CS Fundamentals/10 - Design Principles/05 - Behavioral Design Patterns - Full Code Deep Dive\|Behavioral Design Patterns]] (full before/after Go code) | ✅ |
+| 10.6 | [[CS Fundamentals/10 - Design Principles/06 - Concurrency Patterns in Go\|Concurrency Patterns in Go]] (not GoF — Worker Pool, Pipeline, Fan-out/Fan-in, Context Cancellation, Pub-Sub) | ✅ |
 
 ---
 
