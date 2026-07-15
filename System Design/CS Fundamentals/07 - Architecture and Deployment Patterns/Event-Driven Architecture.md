@@ -97,9 +97,40 @@ sequenceDiagram
 > [!success] The infrastructure and the architectural style, both already covered
 > [[CS Fundamentals/05 - Messaging & Streaming/Kafka Internals|Kafka Internals]] and [[CS Fundamentals/05 - Messaging & Streaming/RabbitMQ Internals|RabbitMQ Internals]] are the infrastructure this architectural style runs on. [[Glossary/Idempotency|Idempotency]] is required discipline for any consumer in this style, since brokers generally guarantee at-least-once delivery, not exactly-once. [[Glossary/Saga Pattern|Saga Pattern]] is choreography or orchestration, precisely defined above, applied specifically to distributed transactions.
 
+## Scaling: one topic to a full event mesh
+
+```mermaid
+flowchart TD
+    A["Few event types,<br/>few consumers<br/>choreography alone, easy to<br/>trace by reading the code"] --> B["Growing event types,<br/>growing consumers<br/>orchestration for complex flows,<br/>choreography for simple reactions"]
+    B --> C["Many services, many events<br/>needs Schema Registry, DLQs, distributed<br/>tracing just to keep the flow debuggable"]
+    C --> D["Massive scale<br/>event mesh spans multiple<br/>brokers/regions; CQRS read models<br/>become necessary for query performance"]
+```
+
+## Failure scenarios
+
+> [!bug] What actually happens
+> - **A consumer is down when an event publishes:** the event isn't lost — it sits durably in the broker (per [[CS Fundamentals/05 - Messaging & Streaming/Kafka Internals|Kafka Internals]]) until the consumer comes back and catches up, the core resilience benefit over a synchronous call that would have simply failed.
+> - **A consumer processes an event twice** (broker's at-least-once delivery, or a retry after a slow ack): without [[Glossary/Idempotency|idempotency]], this silently double-applies an effect (double-charges, double-ships) — the exact reason idempotency is *required* discipline in this style, not optional hygiene.
+> - **Orchestration's central coordinator itself fails mid-flow:** the in-flight saga's state needs to be durably persisted and resumable, or the whole business process stalls indefinitely — a real, specific new failure mode choreography doesn't have, since choreography has no single coordinator to lose.
+
+## Monitoring
+
+> [!info] What to watch
+> **Consumer lag** — the gap between events published and events actually processed; a growing lag signals a consumer falling behind or stuck. **Dead-letter queue volume** — a rising DLQ count is a direct, early signal of a systemic processing bug, not isolated bad messages. **End-to-end flow latency** (via distributed tracing) — the only way to see how long a full choreographed or orchestrated business process actually takes, since no single service has that whole-flow view on its own.
+
+## Common mistakes
+
+> [!warning] Real, recurring errors
+> 1. **Skipping idempotency because "the broker guarantees delivery"** — at-least-once delivery is not exactly-once processing; the Failure Scenarios section above is the direct consequence of skipping this.
+> 2. **Choosing choreography for a complex, many-branch business process** — debugging "which service reacted wrong" across a dozen decentralized reactions is genuinely harder than following one orchestrator's explicit state; orchestration exists precisely for this case.
+> 3. **Using Event-Carried State Transfer indiscriminately** — bloats every event and couples every consumer to the producer's schema, when Event Notification's smaller payload would serve better for consumers needing only a signal.
+
 ---
 
 ## Interview Q&A
+
+> [!info] Leveled by seniority
+> **Beginner:** "What's the core benefit of event-driven architecture over direct service calls?" — decoupling; a producer doesn't need to know or wait for consumers. **Intermediate:** "What's the actual difference between choreography and orchestration?" — decentralized reaction with no central owner vs. a central coordinator explicitly driving each step. **Senior:** "A choreographed flow across 6 services has a bug and no one can tell which service caused it — diagnose the process problem, not just the bug." — expects recognizing this as choreography's known debugging weakness at that complexity, and recommending either distributed tracing investment or migrating that specific flow to orchestration. **Staff:** "Design the failure-recovery strategy for an orchestrator that crashes mid-saga." — expects durable, persisted saga state (not in-memory), so a replacement orchestrator instance can resume from the last completed step rather than restarting or losing the in-flight transaction. **Architect:** "How would you decide, platform-wide, which flows should be choreography vs. orchestration?" — expects a real heuristic: simple, few-step reactions default to choreography for decentralization; complex, many-branch, or compliance-sensitive flows (needing an audit trail of "what step are we on") default to orchestration.
 
 > [!question]- When would you choose orchestration over choreography for implementing a Saga?
 > When the business process has many steps, complex branching logic, or the team needs strong visibility into "which step failed and why" for operational/debugging purposes — a central orchestrator makes the whole flow's state explicit and queryable in one place. Choreography fits simpler flows with few steps, where the decentralization's flexibility outweighs the loss of one clear "current state" view.

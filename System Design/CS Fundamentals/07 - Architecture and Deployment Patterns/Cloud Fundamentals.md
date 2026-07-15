@@ -85,9 +85,40 @@ A **managed service** is the provider's own hosted, operated version of a techno
 > [!success] Direct connections
 > Every "the system auto-scales" claim made casually throughout this book's HLD chapters is enabled by cloud elasticity — the ability to add/remove capacity automatically based on load. [[HLD/14 - Design a Multi-Region Rate Limiter/Design a Multi-Region Rate Limiter|Multi-Region Rate Limiter]]'s region/AZ reasoning is a direct application of the geographic structure above. [[CS Fundamentals/07 - Architecture and Deployment Patterns/Kubernetes Fundamentals|Kubernetes]] is frequently consumed *as* a managed cloud service itself (AWS EKS, GCP GKE) — tying this chapter directly back to the previous one.
 
+## Scaling: 1 VM to a global, multi-region footprint
+
+```mermaid
+flowchart TD
+    A["1 VM,<br/>1 region<br/>simplest possible<br/>starting point"] --> B["Multiple VMs,<br/>multiple AZs<br/>protects against a single<br/>data-center failure"]
+    B --> C["Auto-scaling group<br/>within a region<br/>capacity tracks real-time<br/>load automatically"]
+    C --> D["Multi-region<br/>protects against a whole-area<br/>failure; serves users from the<br/>nearest region for lower latency"]
+```
+
+## Failure scenarios
+
+> [!bug] What actually happens
+> - **A single AZ fails:** already covered above — traffic and capacity in the surviving AZs absorb the load, the direct reason multi-AZ is the resilience baseline.
+> - **An entire region fails** (rare, but real — a regional power grid or networking incident): only a multi-region deployment survives this; single-region deployments, even multi-AZ ones, go down entirely — the specific, higher-cost failure mode multi-region deliberately guards against.
+> - **A managed service has an undocumented quota/rate limit hit unexpectedly at scale:** a real, common surprise — managed services abstract away infrastructure but not their own internal limits, which can throttle a system precisely when it's growing fastest.
+
+## Monitoring
+
+> [!info] What to watch
+> **Per-AZ and per-region health/error rate** — the direct signal for whether a failure is isolated to one AZ/region or systemic. **Managed-service quota utilization** — proactively catches the quota-limit failure scenario above before it becomes an incident. **Cost per unit of traffic/compute** — cloud's pay-for-what-you-use model makes cost itself an operational metric worth tracking, not just a finance-team concern.
+
+## Common mistakes
+
+> [!warning] Real, recurring errors
+> 1. **Deploying to a single AZ "to keep it simple"** — reintroduces the single-data-center-failure risk multi-AZ exists specifically to remove, for a cost savings that's usually small relative to the risk.
+> 2. **Adopting a deeply provider-specific managed service without weighing lock-in** — the vendor lock-in section above; a real, deliberate architectural decision, not a default.
+> 3. **Not monitoring managed-service quotas until they're hit in production** — the quota failure scenario above; these limits are discoverable and plannable ahead of time.
+
 ---
 
 ## Interview Q&A
+
+> [!info] Leveled by seniority
+> **Beginner:** "What's the difference between IaaS, PaaS, and SaaS?" — the exact hierarchy above, by how much you manage vs. the provider does. **Intermediate:** "Why deploy across multiple AZs?" — protects against a single data-center-level failure; already covered precisely above. **Senior:** "A managed database is throttling writes unexpectedly under increased load — diagnose it." — expects checking the provider's documented quota/throughput limits for that managed tier first, per the Failure Scenarios above, rather than assuming an application bug. **Staff:** "Design a deployment topology for a service that needs to survive a regional cloud outage." — expects multi-region deployment with active traffic routing, explicitly distinguishing this from (cheaper, more common) multi-AZ alone. **Architect:** "How would you evaluate whether adopting a new provider-specific managed service is worth the lock-in risk?" — expects weighing the real, quantifiable operational-burden reduction against the concrete cost of a future migration, not treating either lock-in or self-hosting as automatically correct.
 
 > [!question]- Why would a company choose IaaS over PaaS for a given workload?
 > When the team needs fine-grained control over the OS/runtime environment — custom kernel parameters, specific runtime versions, unusual networking setups — that PaaS's managed abstraction doesn't expose. PaaS trades that control for significantly less operational burden, the right choice when the team just wants to ship application code without managing infrastructure underneath it.

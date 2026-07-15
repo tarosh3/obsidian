@@ -97,9 +97,40 @@ OAuth2 solves a different problem: letting a **third-party app** act on a user's
 
 **API keys** — simple, but a single long-lived secret with no built-in rotation or scoping unless the system adds it. **mTLS** — both sides present certificates, common inside a service mesh where every hop is authenticated cryptographically without a shared secret at all. Worth knowing this exists as the answer to "how do internal services trust each other without OAuth."
 
+## Scaling: single service to a full platform's auth layer
+
+```mermaid
+flowchart TD
+    A["Single service,<br/>session auth<br/>server-side session<br/>store is sufficient"] --> B["Growing to an API,<br/>mobile clients<br/>JWTs for stateless<br/>verification across many servers"]
+    B --> C["Many internal services<br/>calling each other<br/>service-to-service auth<br/>(mTLS or a shared token) needed too"]
+    C --> D["Full platform,<br/>third-party integrations<br/>full OAuth2/OIDC + a dedicated<br/>identity provider, not homegrown auth"]
+```
+
+## Failure scenarios
+
+> [!bug] What actually happens
+> - **A refresh token is stolen and replayed after the legitimate client already rotated:** the theft-detection mechanism above catches this directly — the whole token family is revoked, forcing re-login for attacker and legitimate user alike (a real, deliberate cost of the detection, not a bug).
+> - **A JWT is stolen via XSS from `localStorage`:** it remains valid until expiry, undetectable and unrevocable, per the Revocation section — the concrete reason short access-token lifetimes matter even when refresh-token rotation is in place.
+> - **PKCE is skipped on a public client** (a mobile or SPA app with no way to keep a secret confidential): the authorization-code interception attack the PKCE section names becomes directly exploitable — a real, specific vulnerability, not a theoretical one.
+
+## Monitoring
+
+> [!info] What to watch
+> **Refresh-token reuse/replay rate** — a nonzero rate is a direct signal of active token theft in the wild, not noise. **Authentication failure rate, by cause** — distinguishes ordinary bad-password attempts from a credential-stuffing attack pattern, which look different in volume and source diversity. **Token issuance latency at the authorization server** — since every authenticated request downstream depends on this path staying fast and available.
+
+## Common mistakes
+
+> [!warning] Real, recurring errors
+> 1. **Trusting the `alg` field inside a JWT for verification** — the historical "alg: none" attack above; the server must decide the expected algorithm itself.
+> 2. **Skipping PKCE for "internal" or mobile apps** — the PKCE failure scenario above; any client that can't keep a secret confidential needs it, not just untrusted third-party apps.
+> 3. **Storing long-lived tokens in `localStorage`** without weighing the XSS tradeoff explicitly — the storage-location Interview Q&A below; a real, named tradeoff each system should make deliberately, not by default.
+
 ---
 
 ## Interview Q&A
+
+> [!info] Leveled by seniority
+> **Beginner:** "What's the difference between authentication and authorization?" — authentication is *who are you*; authorization is *what are you allowed to do*; independent of each other. **Intermediate:** "Why can't a stateless JWT be revoked before it expires?" — no server-side record to delete; the Revocation section's central point. **Senior:** "Users are occasionally getting logged out unexpectedly across all their devices — diagnose it." — expects checking for refresh-token-family revocation triggered by replay detection, per the Failure Scenarios above, meaning a token was likely stolen and used, not a bug in the rotation logic itself. **Staff:** "Design authentication for a platform where both first-party web clients and third-party integration partners need access." — expects session or short-lived JWTs for first-party, full OAuth2 Authorization Code + PKCE for third-party apps acting on a user's behalf, and Client Credentials for partner service-to-service integration — three different flows for three genuinely different trust relationships, not one scheme forced onto all of them. **Architect:** "How would you design token revocation to take effect within seconds platform-wide, given JWTs are stateless by design?" — expects the refresh-token-as-the-revocable-anchor pattern already covered, potentially combined with a short-lived access-token TTL tight enough that "seconds" becomes achievable, plus (for extreme cases) a lightweight, cache-backed denylist checked at the API gateway layer as a deliberate, explicit exception to pure statelessness.
 
 > [!question]- Why not just make JWTs short-lived enough that revocation doesn't matter?
 > It reduces the blast radius but doesn't eliminate the problem — an account compromise (password reset, permission downgrade, employee offboarding) needs to take effect *immediately*, not in 15 minutes. That's exactly why the refresh token — not the access token — is the piece of state kept server-side and revocable.

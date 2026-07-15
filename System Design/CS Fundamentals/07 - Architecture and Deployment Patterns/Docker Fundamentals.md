@@ -85,6 +85,34 @@ Each Dockerfile instruction creates a new, **cached** layer. Rebuilding an image
 > [!success] Direct connections
 > [[CS Fundamentals/01 - Operating Systems/Memory Management & Virtual Memory|Memory Management & Virtual Memory]] — container memory limits are cgroups, and exceeding them triggers the same OOM-kill mechanism already covered. [[CS Fundamentals/07 - Architecture and Deployment Patterns/Kubernetes Fundamentals|Kubernetes Fundamentals]] (next chapter) — Kubernetes orchestrates containers; it doesn't replace Docker, it manages *many* of them across *many* machines.
 
+## Scaling: one container to an orchestrated fleet
+
+```mermaid
+flowchart TD
+    A["One container,<br/>one machine<br/>docker run, manual"] --> B["Several containers,<br/>one machine<br/>docker-compose for<br/>local multi-container coordination"]
+    B --> C["Many containers,<br/>many machines<br/>needs an orchestrator<br/>(Kubernetes) — next chapter"]
+    C --> D["Registry/build scale<br/>image registry + layer caching<br/>become critical infra, not incidental"]
+```
+
+## Failure scenarios
+
+> [!bug] What actually happens
+> - **A container exceeds its memory limit:** already covered above — the cgroups-scoped OOM-kill terminates it, contained to that container rather than the whole host.
+> - **A shared-kernel vulnerability is exploited:** per the security tradeoff table, a container escape can theoretically affect the host or sibling containers — the real, named reason some workloads still choose VM isolation or containers-inside-VMs for defense in depth.
+> - **An image build breaks reproducibility** (e.g., an unpinned base-image tag silently pulls a newer, different image later): "works on my machine" resurfaces inside Docker itself if image tags aren't pinned to a specific, immutable digest — the exact problem class Docker was meant to solve, reintroduced by a configuration mistake.
+
+## Monitoring
+
+> [!info] What to watch
+> **Per-container CPU/memory usage against its configured limit** — the direct signal for whether a limit is well-tuned or about to trigger an OOM-kill. **Image pull/build time** — a growing trend signals layer-cache misses or an increasingly bloated image, both worth investigating before they slow every deploy. **Container restart count** — frequent restarts point to a crash loop, not normal operation.
+
+## Common mistakes
+
+> [!warning] Real, recurring errors
+> 1. **Wrong Dockerfile instruction order** — the caching section above; costs real build-time on every iteration.
+> 2. **Not pinning base image versions** — the reproducibility failure scenario above; `latest` silently drifts underneath you.
+> 3. **Running containers without memory/CPU limits set** — removes the safety net cgroups exist to provide, letting one runaway container starve the whole host instead of being contained and OOM-killed on its own.
+
 ---
 
 ## Interview Q&A

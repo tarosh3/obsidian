@@ -91,9 +91,40 @@ sequenceDiagram
 > [!success] Direct connections
 > [[CS Fundamentals/06 - Distributed Systems/Service Discovery|Service Discovery]] — Kubernetes Services, covered above. [[CS Fundamentals/06 - Distributed Systems/Consensus (Raft & Paxos)|Consensus (Raft & Paxos)]] — etcd, the control plane's state store, uses Raft internally to stay consistent across its own replicas; the control plane's own reliability depends on exactly the consensus mechanics already covered. [[CS Fundamentals/02 - Networking/Load Balancing|Load Balancing]] — kube-proxy and Kubernetes Ingress are concrete implementations of load-balancing concepts already covered generally.
 
+## Scaling: one cluster to multi-cluster, multi-region
+
+```mermaid
+flowchart TD
+    A["Single cluster,<br/>few nodes<br/>reconciliation loop handles<br/>scheduling/self-healing directly"] --> B["Single cluster,<br/>many nodes<br/>HorizontalPodAutoscaler adds<br/>replicas based on real load"]
+    B --> C["Multiple clusters<br/>per region/environment<br/>isolates blast radius; control plane<br/>failure no longer affects everything"]
+    C --> D["Multi-region<br/>federation/multi-cluster tooling<br/>coordinates across otherwise-independent clusters"]
+```
+
+## Failure scenarios
+
+> [!bug] What actually happens
+> - **A node fails entirely:** already covered above — reconciliation notices every Pod scheduled there is now missing and reschedules replacements elsewhere, at cluster scale rather than single-Pod scale.
+> - **etcd loses quorum:** the control plane can no longer reliably read or write cluster state — no new scheduling decisions, no reconciliation — a direct consequence of etcd's own Raft consensus requiring a majority, per [[CS Fundamentals/06 - Distributed Systems/Consensus (Raft & Paxos)|Consensus]].
+> - **A misconfigured resource limit causes cascading Pod evictions:** Pods without resource requests/limits set can starve neighbors on the same node, triggering evictions that then get rescheduled elsewhere, potentially repeating the problem on the next node — a real, common production incident pattern, not hypothetical.
+
+## Monitoring
+
+> [!info] What to watch
+> **Pod restart count / crash-loop-backoff rate** — the direct signal that reconciliation is fighting a persistent, unresolved problem rather than a one-off blip. **etcd latency and leader-election frequency** — since the whole control plane depends on etcd, per the Failure Scenarios above. **Node resource utilization vs. Pod resource requests** — mismatches here are the direct precursor to the eviction cascade failure mode.
+
+## Common mistakes
+
+> [!warning] Real, recurring errors
+> 1. **Adopting Kubernetes before it's actually needed** — the Tradeoffs warning above, worth repeating as the single most common strategic mistake.
+> 2. **Not setting Pod resource requests/limits** — the eviction-cascade failure scenario above; Kubernetes can't schedule intelligently without this information.
+> 3. **Treating etcd as an implementation detail rather than critical infrastructure** — its own health directly gates the entire cluster's ability to reconcile anything.
+
 ---
 
 ## Interview Q&A
+
+> [!info] Leveled by seniority
+> **Beginner:** "What does Kubernetes actually do?" — orchestrates many containers across many machines: scheduling, scaling, self-healing, networking. **Intermediate:** "What's the single most important Kubernetes concept?" — declarative desired state, continuously reconciled against actual state, per the section above. **Senior:** "Pods are being evicted repeatedly across a cluster — diagnose it." — expects checking resource requests/limits first, per the eviction-cascade failure scenario, before assuming a Kubernetes bug. **Staff:** "Design a Kubernetes deployment topology for a service that must survive an entire cluster's control plane becoming unavailable." — expects multi-cluster deployment (Scaling section), since a single cluster's control-plane failure is a single point of failure no amount of Pod replication within that cluster protects against. **Architect:** "How would you decide when a platform has outgrown a single Kubernetes cluster?" — expects reasoning about blast-radius isolation (one team's misconfiguration shouldn't threaten every other team's workloads) and etcd/control-plane scaling limits, not just raw node count.
 
 > [!question]- How does Kubernetes handle a node failing entirely, not just one Pod crashing?
 > The control plane detects the node is unreachable (missed heartbeats, the same mechanism covered generally in earlier chapters), marks it unhealthy, and the reconciliation loop notices every Pod that was scheduled on that node is now missing from actual state — it reschedules replacements on healthy nodes to restore the declared replica count, the identical mechanism as a single Pod crash, just triggered at a larger scale.
