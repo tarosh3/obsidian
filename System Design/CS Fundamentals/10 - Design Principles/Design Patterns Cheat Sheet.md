@@ -8,10 +8,13 @@ status: reference-quality
 # Design Patterns Cheat Sheet
 
 > [!abstract] What you'll be able to do after this chapter
-> Recognize all 23 classic GoF patterns by their real-world shape, not their name — know instantly which ones this book teaches with full compilable Go code, and which ones you should be able to describe correctly even without a dedicated case study.
+> Recognize all 23 classic GoF patterns by their real-world shape, not their name — every single one now has real Go code (before *and* after) somewhere in this handbook, either as a full narrative LLD case study or in one of the 3 category deep-dive chapters this one indexes.
 
 > [!info] How this chapter is organized
-> 8 patterns get a **full LLD chapter** elsewhere in this book — built via bad-code-first-refactor, complete Go code, real interview Q&A. Those are linked, not re-taught here. The remaining 15 get a **cheat-sheet-level entry**: definition, layman analogy, when to reach for it, and a Go-specific note — enough to recognize and describe them correctly, without a dedicated case study built around each.
+> 8 patterns get a **full LLD chapter** elsewhere in this book — built via bad-code-first-refactor, complete Go code, real interview Q&A. Those are linked, not re-taught here. The remaining 15 each get a **full before/after Go code pair** — real bad code, the exact refactor, tradeoffs — in one of 3 dedicated deep-dive chapters, grouped by category: [[CS Fundamentals/10 - Design Principles/Creational Design Patterns - Full Code Deep Dive|Creational]], [[CS Fundamentals/10 - Design Principles/Structural Design Patterns - Full Code Deep Dive|Structural]], [[CS Fundamentals/10 - Design Principles/Behavioral Design Patterns - Full Code Deep Dive|Behavioral]]. The entries below stay at cheat-sheet depth (definition, layman analogy, when to reach for it) — go to the deep-dive chapters for the actual code.
+
+> [!tip] Concurrency patterns aren't GoF, but they're just as real
+> [[CS Fundamentals/10 - Design Principles/Concurrency Patterns in Go|Concurrency Patterns in Go]] covers 5 patterns (Worker Pool, Pipeline, Fan-out/Fan-in, Context Cancellation, Pub-Sub) that don't appear in the classic 23 at all — GoF predates concurrency-first language design. Genuinely asked in Go-based system design interviews, and worth knowing as their own category, not squeezed into the GoF taxonomy.
 
 > [!tip] Never memorize a pattern name — recognize the shape
 > Every entry below states the **problem shape** first. In an interview, you rarely get asked "implement the Decorator pattern" — you get a requirement that *has* Decorator's shape, and the strongest answer names the pattern because you recognized the shape, not because you pattern-matched a keyword.
@@ -132,31 +135,31 @@ status: reference-quality
 
 ## Quick-reference table
 
-| Pattern | Category | Full chapter? |
+| Pattern | Category | Full chapter / code? |
 |---|---|---|
-| Factory Method | Creational | ✅ [[LLD/01 - Design a Parking Lot/Design a Parking Lot\|Parking Lot]] |
-| Abstract Factory | Creational | Cheat-sheet only |
-| Builder | Creational | Cheat-sheet only (Go functional options) |
-| Singleton | Creational | Cheat-sheet only |
-| Prototype | Creational | Cheat-sheet only |
-| Adapter | Structural | Cheat-sheet only |
-| Bridge | Structural | Cheat-sheet only |
-| Composite | Structural | ✅ [[LLD/09 - Design Chess/Design Chess\|Chess]], [[LLD/16 - Design a File System/Design a File System\|File System]] |
-| Decorator | Structural | Cheat-sheet only (linked to Food Delivery follow-up) |
-| Facade | Structural | Cheat-sheet only (API Gateway parallel) |
-| Flyweight | Structural | Cheat-sheet only |
-| Proxy | Structural | Cheat-sheet only |
-| Strategy | Behavioral | ✅ Parking Lot, Rate Limiter, Elevator, LRU Cache, Stock Exchange |
-| Observer | Behavioral | ✅ [[LLD/08 - Design a Notification System/Design a Notification System\|Notification System]], [[LLD/22 - Design Google Meet/Design Google Meet\|Google Meet]] |
-| State | Behavioral | ✅ Vending Machine, Elevator, ATM, Food Delivery |
-| Command | Behavioral | ✅ [[LLD/11 - Design an ATM/Design an ATM\|ATM]], [[LLD/15 - Design a Text Editor/Design a Text Editor\|Text Editor]] |
-| Chain of Responsibility | Behavioral | ✅ Logger Framework, Notification System |
-| Mediator | Behavioral | ✅ [[LLD/18 - Design a Chat Application/Design a Chat Application\|Chat Application]] |
-| Memento | Behavioral | Considered & rejected — see Text Editor chapter |
-| Template Method | Behavioral | Cheat-sheet only |
-| Visitor | Behavioral | Cheat-sheet only (Go limitation noted) |
-| Iterator | Behavioral | Cheat-sheet only (Go-native via `range`) |
-| Interpreter | Behavioral | Cheat-sheet only (Calendar RRULE parallel) |
+| Factory Method | Creational | ✅ [[LLD/01 - Design a Parking Lot/Design a Parking Lot\|Parking Lot]] (full LLD chapter) |
+| Abstract Factory | Creational | ✅ [[CS Fundamentals/10 - Design Principles/Creational Design Patterns - Full Code Deep Dive\|Creational Deep Dive]] (before/after code) |
+| Builder | Creational | ✅ [[CS Fundamentals/10 - Design Principles/Creational Design Patterns - Full Code Deep Dive\|Creational Deep Dive]] (Go functional options) |
+| Singleton | Creational | ✅ [[CS Fundamentals/10 - Design Principles/Creational Design Patterns - Full Code Deep Dive\|Creational Deep Dive]] (`sync.Once`) |
+| Prototype | Creational | ✅ [[CS Fundamentals/10 - Design Principles/Creational Design Patterns - Full Code Deep Dive\|Creational Deep Dive]] |
+| Adapter | Structural | ✅ [[CS Fundamentals/10 - Design Principles/Structural Design Patterns - Full Code Deep Dive\|Structural Deep Dive]] |
+| Bridge | Structural | ✅ [[CS Fundamentals/10 - Design Principles/Structural Design Patterns - Full Code Deep Dive\|Structural Deep Dive]] |
+| Composite | Structural | ✅ [[LLD/09 - Design Chess/Design Chess\|Chess]], [[LLD/16 - Design a File System/Design a File System\|File System]] (full LLD chapters) |
+| Decorator | Structural | ✅ [[CS Fundamentals/10 - Design Principles/Structural Design Patterns - Full Code Deep Dive\|Structural Deep Dive]] (linked to Food Delivery follow-up) |
+| Facade | Structural | ✅ [[CS Fundamentals/10 - Design Principles/Structural Design Patterns - Full Code Deep Dive\|Structural Deep Dive]] (API Gateway parallel) |
+| Flyweight | Structural | ✅ [[CS Fundamentals/10 - Design Principles/Structural Design Patterns - Full Code Deep Dive\|Structural Deep Dive]] |
+| Proxy | Structural | ✅ [[CS Fundamentals/10 - Design Principles/Structural Design Patterns - Full Code Deep Dive\|Structural Deep Dive]] |
+| Strategy | Behavioral | ✅ Parking Lot, Rate Limiter, Elevator, LRU Cache, Stock Exchange (full LLD chapters) |
+| Observer | Behavioral | ✅ [[LLD/08 - Design a Notification System/Design a Notification System\|Notification System]], [[LLD/22 - Design Google Meet/Design Google Meet\|Google Meet]] (full LLD chapters) |
+| State | Behavioral | ✅ Vending Machine, Elevator, ATM, Food Delivery (full LLD chapters) |
+| Command | Behavioral | ✅ [[LLD/11 - Design an ATM/Design an ATM\|ATM]], [[LLD/15 - Design a Text Editor/Design a Text Editor\|Text Editor]] (full LLD chapters) |
+| Chain of Responsibility | Behavioral | ✅ Logger Framework, Notification System (full LLD chapters) |
+| Mediator | Behavioral | ✅ [[LLD/18 - Design a Chat Application/Design a Chat Application\|Chat Application]] (full LLD chapter) |
+| Memento | Behavioral | ✅ [[CS Fundamentals/10 - Design Principles/Behavioral Design Patterns - Full Code Deep Dive\|Behavioral Deep Dive]] (contrasted against Text Editor's Command choice) |
+| Template Method | Behavioral | ✅ [[CS Fundamentals/10 - Design Principles/Behavioral Design Patterns - Full Code Deep Dive\|Behavioral Deep Dive]] |
+| Visitor | Behavioral | ✅ [[CS Fundamentals/10 - Design Principles/Behavioral Design Patterns - Full Code Deep Dive\|Behavioral Deep Dive]] (Go limitation noted) |
+| Iterator | Behavioral | ✅ [[CS Fundamentals/10 - Design Principles/Behavioral Design Patterns - Full Code Deep Dive\|Behavioral Deep Dive]] (Go-native via `range`) |
+| Interpreter | Behavioral | ✅ [[CS Fundamentals/10 - Design Principles/Behavioral Design Patterns - Full Code Deep Dive\|Behavioral Deep Dive]] (Calendar RRULE parallel) |
 
 ## Scaling: recognizing pattern needs as a codebase grows
 
@@ -199,8 +202,13 @@ flowchart TD
 > [!question]- Which patterns are most commonly confused with each other, and how do you tell them apart?
 > Decorator vs. Proxy — both wrap an object behind the same interface, but Decorator *adds* new behavior/responsibility, while Proxy *controls access* to existing behavior without adding new responsibility. Strategy vs. State — covered above. Observer vs. Mediator — covered in depth in [[LLD/18 - Design a Chat Application/Design a Chat Application|the Chat Application chapter]] (broadcasting a change vs. centralizing communication).
 
-> [!question]- Why does this book only build full LLD chapters for 8 of the 23 patterns?
-> Those 8 are the ones that show up constantly in real interview questions across genuinely different domains (booking systems, notification pipelines, game logic, undo/redo, chat). The other 15 are real and worth recognizing precisely — but building a dedicated, deep case study around each would mean inventing an artificial problem just to justify the pattern, working backward from the solution instead of forward from a real requirement, which is exactly the anti-pattern this book's LLD teaching method (bad code first, feel why it breaks, then refactor) is designed to avoid.
+> [!question]- Why does this book only build full narrative LLD chapters for 8 of the 23 patterns, if all 23 now have code?
+> Those 8 are the ones that show up constantly in real interview questions across genuinely different domains (booking systems, notification pipelines, game logic, undo/redo, chat) — they earn a full, real requirement to design around, end to end. The other 15 get a real before/after code pair in the deep-dive chapters (not a snippet), but not a full narrative case study, because inventing an artificial problem just to justify a dedicated chapter around each would mean working backward from the solution instead of forward from a real requirement — exactly the anti-pattern this book's LLD teaching method is designed to avoid. The before/after pair still shows you the bad code, why it breaks, and the exact fix — just without a full system wrapped around it.
+
+## Concurrency patterns — a different category entirely
+
+> [!info] Not GoF, but genuinely important for this handbook's Go-based LLD chapters
+> [[CS Fundamentals/10 - Design Principles/Concurrency Patterns in Go|Concurrency Patterns in Go]] covers Worker Pool, Pipeline, Fan-out/Fan-in, Context Cancellation, and Pub-Sub — none of these appear in the classic 23, since GoF predates concurrency-first language design entirely. Real, commonly-asked, and worth knowing as their own category rather than forced into the GoF taxonomy.
 
 ---
-*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[CS Fundamentals/10 - Design Principles/SOLID Principles|SOLID Principles]]*
+*Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[CS Fundamentals/10 - Design Principles/SOLID Principles|SOLID Principles]] · [[CS Fundamentals/10 - Design Principles/Creational Design Patterns - Full Code Deep Dive|Creational Design Patterns]] · [[CS Fundamentals/10 - Design Principles/Structural Design Patterns - Full Code Deep Dive|Structural Design Patterns]] · [[CS Fundamentals/10 - Design Principles/Behavioral Design Patterns - Full Code Deep Dive|Behavioral Design Patterns]] · [[CS Fundamentals/10 - Design Principles/Concurrency Patterns in Go|Concurrency Patterns in Go]]*
