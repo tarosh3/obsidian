@@ -69,9 +69,43 @@ Databases keep a large in-memory cache of recently-used disk pages — InnoDB's 
 >
 > **PostgreSQL** has no comparable clustering-by-default — table rows live in a **heap**, in roughly insertion order, unless you explicitly run `CLUSTER` (a one-time, non-maintained physical reorganization, not an ongoing property). Every Postgres index — including the primary key's — is a **secondary** index pointing to a heap location (a tuple ID), meaning **every** index lookup requires an extra fetch into the heap to get the full row, *unless* the query can be satisfied entirely from the index itself (an **index-only scan**, which additionally requires Postgres's visibility map to confirm no relevant dead tuples exist, since MVCC old-versions bookkeeping intersects with this optimization directly).
 
+## 8. Scaling: 1 user to 1 billion rows
+
+```mermaid
+flowchart TD
+    A["Small table<br/>query planner barely matters,<br/>everything is fast"] --> B["Growing table<br/>index selection starts mattering,<br/>EXPLAIN becomes a real tool"]
+    B --> C["Huge table<br/>buffer pool sizing critical,<br/>stale statistics cause real regressions"]
+    C --> D["Beyond one machine<br/>query execution doesn't scale further —<br/>sharding forces cross-shard 'joins'<br/>into application code"]
+```
+
+At small scale, nearly any query plan is fast enough that the optimizer's choices are invisible. As tables grow, index selection and plan quality start to directly determine whether a query takes milliseconds or seconds — this is where `EXPLAIN ANALYZE` becomes an everyday tool, not just a debugging one. At large scale, buffer pool/`shared_buffers` sizing becomes a first-class capacity decision (a working set that no longer fits means real disk I/O on every query), and stale statistics cause genuinely surprising regressions as data volume and distribution shift. Past what a single machine's query planner can reason about at all, [[CS Fundamentals/06 - Distributed Systems/Sharding & Partitioning|sharding]] becomes necessary — and a single SQL engine's join capability doesn't extend across shards, forcing cross-shard joins into application-level logic or a dedicated distributed query layer.
+
+## 9. Failure scenarios
+
+> [!bug] What actually happens
+> - **The optimizer picks a bad plan from stale statistics:** already covered in Section 1 — a real, common "this used to be fast" production incident, not a rare edge case.
+> - **A runaway query exhausts the connection pool:** one badly-written or unexpectedly-expensive query holding a connection open for a long time can starve every other request of a connection, cascading into app-level failures that look unrelated to the actual root cause.
+> - **Extreme data skew the optimizer's cost model can't capture:** the optimizer generally assumes independence between column values; genuinely correlated columns (Section 4) can cause it to badly misjudge selectivity and pick a poor plan even with fresh statistics.
+
+## 10. Monitoring
+
+> [!info] What to watch
+> **Slow query log** — the direct, first-line tool for catching expensive queries before they become a production incident. **Buffer pool / `shared_buffers` hit ratio** — a declining ratio signals the working set no longer fits in memory. **Active connections vs. max** — the leading indicator before connection-pool exhaustion becomes a cascading failure. **`EXPLAIN ANALYZE` estimated-vs-actual divergence**, tracked over time for key queries — a growing gap is the direct signal that statistics need refreshing.
+
+## 11. Common mistakes
+
+> [!warning] Real, recurring errors
+> 1. **Assuming an unused index is always a bug** — Section 3 covers this precisely; a sequential scan can be the *correct* choice for a non-selective filter.
+> 2. **Never refreshing statistics** (or disabling autovacuum in Postgres) — the optimizer's decisions are only as good as the statistics it's working from.
+> 3. **Guessing at query performance instead of running `EXPLAIN ANALYZE`** — the actual, direct tool for the job, not a last resort.
+> 4. **Running large ad-hoc analytical queries directly against a production OLTP primary** — competes for buffer pool and connections with live traffic; a read replica exists precisely to isolate this kind of load.
+
 ---
 
 ## 🎯 Interview follow-up Q&A
+
+> [!info] Leveled by seniority
+> **Beginner:** "What does an index do?" — lets the engine skip irrelevant data instead of scanning everything, Section 2. **Intermediate:** "Why might the optimizer skip an available index?" — Section 3, non-selective filters make a seq scan cheaper. **Senior:** "A query's performance suddenly degraded with no code change — walk through your diagnosis." — expects checking `EXPLAIN ANALYZE`'s estimated-vs-actual divergence first (stale statistics), then data-growth/skew as the likely causes, not guessing at a fix. **Staff:** "Design a strategy to prevent one team's analytical queries from degrading another team's OLTP latency on the same database." — expects read replicas or a dedicated analytical replica/warehouse named explicitly, isolating the resource contention at the infrastructure level rather than trying to tune queries alone. **Architect:** "How would query execution strategy need to change as a single-node database is sharded across many nodes?" — expects the Section 8 answer: cross-shard joins move into application code or a distributed query layer, since no single node's optimizer has visibility across shard boundaries.
 
 > [!quote]- "Why would a database choose NOT to use an available index for a query?"
 > If the query's filter isn't selective enough — matching a large fraction of the table — a sequential scan's cheap, pure sequential I/O can beat an index scan's extra random I/O overhead. The optimizer picking a seq scan in that case is correct, not a missed opportunity.

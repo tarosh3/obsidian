@@ -44,9 +44,43 @@ MongoDB offers two sharding strategies with a genuine tradeoff: **hashed shardin
 
 Needing **multi-document ACID transactions across many collections at high throughput** — supported since MongoDB 4.0, but with a real, non-trivial performance cost; worth stating precisely rather than the outdated "MongoDB doesn't support transactions" claim, which is simply wrong for modern versions. **Highly relational data with frequent many-to-many joins** — MongoDB's `$lookup` aggregation stage exists, but isn't as efficient as native relational joins at scale. Needing **strict schema enforcement** as a first-class, always-on guarantee rather than an opt-in validation layer.
 
+## 7. Scaling: 1 user to 1 billion
+
+```mermaid
+flowchart TD
+    A["Single instance /<br/>one replica set<br/>fine for moderate scale"] --> B["Growing<br/>add secondaries<br/>for read scaling"]
+    B --> C["Large scale<br/>sharding required —<br/>shard-key choice is<br/>THE critical decision"]
+    C --> D["Global scale<br/>zone sharding —<br/>specific shard ranges<br/>placed in specific geographic zones"]
+```
+
+At moderate scale, a single replica set (one primary, a couple of secondaries for durability and read offload) handles most workloads comfortably. As read traffic grows, adding more secondaries scales reads directly, at the cost of the staleness/consistency tradeoff already named in Section 4. Once write volume or dataset size exceeds what one replica set can handle, sharding becomes necessary — and the shard-key decision (Section 5) becomes the single highest-leverage choice in the whole deployment, since correcting it later is expensive. At global scale, **zone sharding** — explicitly placing specific shard key ranges in specific geographic zones — combines sharding with physical placement, letting data live close to the users who predominantly access it.
+
+## 8. Failure scenarios
+
+> [!bug] What actually happens
+> - **The primary fails:** an automatic election among secondaries promotes a new primary — conceptually similar to Raft-style consensus (Section 4), with a brief unavailability window for writes during the election itself.
+> - **A single shard's replica set loses its primary:** that shard's own election happens independently — unrelated shards and their data remain fully available throughout, a direct benefit of each shard being its own independently-replicated unit.
+> - **Network partition between the `mongos` router and a specific shard:** that shard's data becomes temporarily unreachable *through that router*, while queries targeting other shards continue normally — a partial, contained failure rather than a full outage.
+
+## 9. Monitoring
+
+> [!info] What to watch
+> **Replication lag per secondary** — directly determines how stale a read-from-secondary can be. **Primary election frequency** — a rising rate signals an unstable primary (often resource starvation), not just "normal" occasional failover. **Per-shard chunk distribution** — the direct, proactive way to catch a hot shard forming, rather than discovering it after a customer-visible slowdown. **Oplog window size** — how much write history the primary's oplog retains; too small a window means a secondary that falls behind during a slow period can't catch up incrementally and needs a full, expensive resync.
+
+## 10. Common mistakes
+
+> [!warning] Real, recurring errors
+> 1. **Choosing a monotonically increasing shard key** — Section 5 covers this precisely.
+> 2. **Assuming reads from secondaries are always safe** — without considering replication lag, a secondary read can return meaningfully stale data for workloads that need current information.
+> 3. **Treating `$lookup` as cost-equivalent to a relational JOIN** — it isn't as efficient at scale; leaning on it heavily is often a sign the data model should be reconsidered rather than a straightforward feature substitution.
+> 4. **Sizing the oplog too small** — during a slow period or maintenance window, an undersized oplog window means a temporarily-lagging secondary can silently fall irrecoverably behind, needing a full resync rather than a quick catch-up.
+
 ---
 
 ## 🎯 Interview follow-up Q&A
+
+> [!info] Leveled by seniority
+> **Beginner:** "What is MongoDB, and how does its data model differ from a relational database?" — Section 1-2, flexible documents instead of rigid tables, related data nested instead of joined. **Intermediate:** "What changed between MMAPv1 and WiredTiger?" — Section 3, document-level locking replacing much coarser locking. **Senior:** "Diagnose an unevenly-loaded sharded MongoDB cluster." — expects checking per-shard chunk distribution first, then confirming whether it's a genuine shard-key design flaw (Section 5) vs. a celebrity-key hotspot needing key-splitting, per [[CS Fundamentals/06 - Distributed Systems/Sharding & Partitioning|Sharding & Partitioning]]. **Staff:** "Design a globally-distributed MongoDB deployment where European user data must stay in Europe for compliance." — expects zone sharding named explicitly, tying shard key ranges to specific geographic zones by policy. **Architect:** "How would you decide between MongoDB and Cassandra for a new write-heavy, globally-distributed system?" — expects a real tradeoff: MongoDB's richer query model and document flexibility vs. Cassandra's leaderless architecture and simpler horizontal write scaling without manual resharding — not a reflexive "NoSQL is NoSQL" answer.
 
 > [!quote]- "Why does MongoDB's document model reduce the need for joins?"
 > Related data can be nested directly inside one document (arrays, sub-documents) instead of living in separate tables that need to be joined at query time — a single document read returns a fully-formed object. This is denormalization built into the storage model itself, trading some data duplication and update complexity for simpler, faster reads.

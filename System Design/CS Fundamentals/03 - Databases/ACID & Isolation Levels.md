@@ -90,9 +90,43 @@ Two real mechanisms, worth naming precisely rather than treating isolation as a 
 
 ACID is the strong-consistency end of the same spectrum [[Glossary/BASE|BASE]] sits at the other end of — the same strong-vs-eventual tradeoff already covered generally in [[CS Fundamentals/06 - Distributed Systems/CAP Theorem & PACELC|CAP Theorem & PACELC]], here specifically as the SQL world's concrete instantiation of the "strong" side. Many NoSQL databases deliberately relax some or all ACID guarantees in exchange for horizontal scale and availability — [[CS Fundamentals/03 - Databases/Cassandra Internals|Cassandra Internals]] and [[CS Fundamentals/03 - Databases/MongoDB Internals|MongoDB Internals]] both make this tradeoff explicitly.
 
+## Scaling: 1 user to 1 billion
+
+```mermaid
+flowchart TD
+    A["1 user<br/>no concurrency,<br/>isolation is moot"] --> B["Growing concurrent users<br/>default isolation level<br/>(Read Committed) sufficient<br/>for most operations"]
+    B --> C["High contention<br/>on specific rows<br/>need targeted stronger<br/>guarantees for THAT operation<br/>(atomic update, explicit lock, Serializable)"]
+    C --> D["Distributed / sharded scale<br/>single-node ACID no longer<br/>spans the whole dataset —<br/>forced into Saga/2PC per Sharding & Partitioning"]
+```
+
+At low concurrency, isolation level is nearly invisible — anomalies need overlapping concurrent transactions to even be possible. As concurrent load grows, the database's default isolation level (Read Committed for Postgres, Repeatable Read for MySQL) handles most operations fine, with targeted fixes (an atomic conditional update, an explicit row lock) applied only where a specific, known race condition matters — never blanket Serializable everywhere. At distributed/sharded scale, ACID's guarantees stop spanning the whole dataset at all — a transaction touching data on two different shards has no single-node WAL or lock table covering both, forcing the [[Glossary/Two-Phase Commit (2PC)|2PC]]/[[Glossary/Saga Pattern|Saga]] tradeoff already covered in [[CS Fundamentals/06 - Distributed Systems/Sharding & Partitioning|Sharding & Partitioning]].
+
+## Failure scenarios
+
+> [!bug] What actually happens
+> - **Crash mid-transaction:** the WAL is replayed on restart — any transaction that hadn't committed is rolled back entirely (Atomicity enforced even across a crash), any transaction that had committed is guaranteed present (Durability).
+> - **A long-running transaction holding locks:** under lock-based isolation, other transactions needing the same rows simply wait — a transaction accidentally left open across a slow network call or user think-time is a real, common production incident, blocking unrelated work that shouldn't have been affected at all.
+> - **Deadlock:** two transactions each hold a lock the other needs — the database detects the cycle and aborts one transaction (returning a deadlock error), forcing the application to retry. This is expected, handled behavior, not a bug — applications touching multiple rows/tables need retry logic for exactly this case.
+
+## Monitoring
+
+> [!info] What to watch
+> **Long-running transaction detection** — the direct signal for the lock-contention failure mode above, catchable before it causes a wider incident. **Lock wait time** — rising values signal contention building up. **Deadlock rate** — a non-zero baseline is normal for some workloads, but a rising trend signals a real access-pattern problem. **Serialization failure/retry rate** — for any code path using Serializable isolation, this is the direct, measurable cost of that choice.
+
+## Common mistakes
+
+> [!warning] Real, recurring errors
+> 1. **Assuming "it's in a transaction" alone prevents all race conditions** — Section "What real databases actually default to" already names this precisely; the isolation level configured is what actually matters.
+> 2. **Not knowing your database's actual default isolation level** — Postgres and MySQL default to genuinely different levels; assuming one when running the other is a real, catchable interview and production gap.
+> 3. **Holding a transaction open across a network call or user interaction** — locks held for the duration block unrelated work for far longer than the actual database operation needs.
+> 4. **Reaching for Serializable everywhere "to be safe"** — pays real throughput cost via aggressive locking/retries for every transaction, when a targeted fix at the few genuinely contended operations is usually the better answer.
+
 ---
 
 ## Interview Q&A
+
+> [!info] Leveled by seniority
+> **Beginner:** "What does the 'I' in ACID stand for and what does it prevent?" — Isolation; prevents concurrent transactions from seeing each other's in-progress, uncommitted work. **Intermediate:** "Name the three isolation anomalies and give an example of each." — dirty read, non-repeatable read, phantom read, per the table above. **Senior:** "A specific endpoint is experiencing intermittent data corruption under load — how do you diagnose an isolation-level gap?" — expects checking the actual configured isolation level first, then identifying the specific check-then-act sequence in the code that isolation alone doesn't protect, per the BookMyShow/ATM cross-link. **Staff:** "Design the transaction/consistency strategy for a system where 95% of operations are low-stakes but 5% (payments) require the strongest guarantees." — expects a per-operation isolation strategy, not one global level, mirroring the "targeted fix, not blanket Serializable" principle above. **Architect:** "How does ACID's meaning change once a system is sharded across multiple nodes?" — expects the Scaling section's answer: single-node ACID no longer covers the whole dataset, forcing an explicit Saga/2PC decision for any operation spanning shards.
 
 > [!question]- Why would a default isolation level ever be insufficient for correctness?
 > The classic check-then-act race condition — read a balance, then write a new balance based on it — can still corrupt data under Read Committed, since another transaction can commit a conflicting change in the gap between the read and the write. This is precisely why [[LLD/06 - Design BookMyShow - Seat Booking/Design BookMyShow - Seat Booking|BookMyShow's]] and [[LLD/11 - Design an ATM/Design an ATM|the ATM's]] fixes use an atomic conditional update (or a row-level lock) rather than relying on isolation level alone — a stronger guarantee than the database's default provides for granted.

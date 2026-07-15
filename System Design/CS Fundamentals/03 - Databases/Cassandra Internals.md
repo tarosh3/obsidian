@@ -56,9 +56,43 @@ Cassandra is **peer-to-peer / leaderless** — no single node coordinates the cl
 
 Needing traditional **multi-row ACID transactions or joins** — Cassandra has no native support for either in the relational sense (lightweight transactions via Paxos exist, but only for narrow compare-and-swap use cases, not general multi-statement transactions). Needing **strong consistency by default** rather than opted into per-query. Workloads with **frequent deletes** (the tombstone problem above). Small scale, where the operational complexity of running and tuning a Cassandra cluster isn't justified by the workload.
 
+## 8. Scaling: 1 user to 1 billion
+
+```mermaid
+flowchart TD
+    A["Small cluster<br/>a few nodes,<br/>replication factor 3 typical"] --> B["Growing<br/>add nodes — vnodes auto-rebalance<br/>via consistent hashing, NO manual<br/>resharding needed unlike traditional SQL"]
+    B --> C["Massive scale<br/>multi-datacenter deployments,<br/>NetworkTopologyStrategy,<br/>LOCAL_QUORUM avoids cross-DC latency"]
+    C --> D["Global scale<br/>per-operation consistency-level<br/>choice becomes essential — not every<br/>read/write can afford cross-region coordination"]
+```
+
+A genuinely distinguishing property vs. traditional sharded SQL: adding a Cassandra node doesn't require a separate, deliberate resharding *process* — the consistent-hashing ring (with vnodes) automatically absorbs the new node, redistributing a bounded fraction of the keyspace to it, the exact mechanism already covered generally in [[CS Fundamentals/06 - Distributed Systems/Consistent Hashing|Consistent Hashing]]. At multi-datacenter scale, `NetworkTopologyStrategy` lets replication be placement-aware (e.g., 3 replicas per datacenter), and `LOCAL_QUORUM` lets a query require agreement only from replicas in the *local* datacenter, avoiding the latency cost of coordinating across a continent for every operation. At true global scale, the per-query consistency-level choice (Section 4) stops being a nice feature and becomes an essential, deliberate decision for every operation — not every read or write can afford to pay cross-region coordination latency.
+
+## 9. Failure scenarios
+
+> [!bug] What actually happens, precisely — including a Cassandra-specific mechanism
+> - **A node goes down:** gossip detects it; other replicas continue serving per the configured consistency level — no single point of failure, the direct payoff of the leaderless design from Section 5.
+> - **A whole datacenter goes down** (multi-DC deployment): other datacenters continue serving if `NetworkTopologyStrategy` was configured with cross-DC replication — a genuinely different failure domain than a single node, protected against by a genuinely different mechanism (replication topology, not just node-level redundancy).
+> - **Hinted handoff — a real, Cassandra-specific recovery mechanism:** when a replica is temporarily unreachable during a write, the coordinator node stores a "hint" (the pending write) and replays it to the replica once it recovers — bounded recovery from a *brief* outage without requiring a full repair, worth naming explicitly as distinct from the longer-running anti-entropy repair process for larger gaps.
+
+## 10. Monitoring
+
+> [!info] What to watch
+> **Read/write latency, broken down per consistency level** — since different operations may use different levels, an aggregate latency number hides real per-level differences. **Compaction backlog** — falling behind on compaction means more SSTables to check per read, directly degrading read latency over time. **Tombstone count/ratio** — the direct, measurable early-warning signal for Section 6's read-degradation problem, before it becomes customer-visible. **Hinted-handoff backlog** — a growing backlog signals a node has been down long enough that hint storage itself is becoming a real resource concern.
+
+## 11. Common mistakes
+
+> [!warning] Real, recurring errors
+> 1. **Using Cassandra as a queue** — Section 6 covers this precisely; frequent deletes accumulate tombstones faster than compaction can clear them.
+> 2. **Choosing `ALL` consistency by default "to be safe"** — defeats much of the availability benefit the whole architecture is built around; `QUORUM` is usually the right default, with `ALL` reserved for genuinely critical operations.
+> 3. **Poor partition key choice causing unbounded-wide partitions** — a partition that grows without bound (e.g., keyed only by a low-cardinality value with unlimited clustering rows) is a real, distinct anti-pattern from MongoDB's hot-shard problem, causing its own performance degradation as a single partition grows too large to handle efficiently.
+> 4. **Not planning clustering-column sort order at schema design time** — this is a physical, on-disk decision made once at table creation, not something easily changed later without a data migration.
+
 ---
 
 ## 🎯 Interview follow-up Q&A
+
+> [!info] Leveled by seniority
+> **Beginner:** "What kind of database is Cassandra?" — a wide-column, leaderless, LSM-Tree-based store built for write-heavy, always-available workloads. **Intermediate:** "Why is Cassandra fast at writes?" — Section 3, no read-before-write, purely sequential I/O on the write path. **Senior:** "A Cassandra table's read latency has been climbing steadily — diagnose it." — expects checking tombstone ratio and compaction backlog first, the two direct, named causes of gradual read-latency degradation in this chapter. **Staff:** "Design the replication and consistency strategy for a Cassandra deployment spanning 3 datacenters on different continents." — expects `NetworkTopologyStrategy` and `LOCAL_QUORUM` named explicitly, with a clear articulation of which operations can tolerate local-only consistency vs. which need cross-DC guarantees. **Architect:** "How would you decide between Cassandra and a sharded relational database for a new write-heavy system?" — expects a real tradeoff: Cassandra trades relational query flexibility (joins, ACID transactions) for write throughput and operational simplicity of scaling (no manual resharding), the right call specifically when the access patterns are known upfront and don't need relational flexibility.
 
 > [!quote]- "Why is Cassandra so much faster at writes than a typical relational database?"
 > Writes never touch the read path at all — they go to an in-memory memtable plus a purely sequential commit-log append. No read-before-write, no random disk I/O, no index maintenance blocking the write.
