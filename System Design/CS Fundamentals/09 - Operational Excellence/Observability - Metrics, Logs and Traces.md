@@ -83,9 +83,40 @@ sequenceDiagram
 > [!success] Direct connections
 > [[HLD/20 - Design a Log Aggregation and Monitoring System/Design a Log Aggregation and Monitoring System|Log Aggregation / Monitoring System]] — the applied infrastructure for the logs and metrics pillars at scale. [[00 - Start Here/100 System Design Interview Questions|"How do you debug a sudden latency spike in production?"]] from the 100-questions file — a trace is the actual tool that answers this precisely, rather than guessing which service is slow. [[Glossary/Latency Percentiles (P50, P90, P99)|Latency Percentiles]] — exactly what the metrics pillar measures and alerts on.
 
+## Scaling: one dashboard to a full observability platform
+
+```mermaid
+flowchart TD
+    A["Single service,<br/>one dashboard<br/>basic metrics,<br/>no tracing needed yet"] --> B["Few services<br/>correlated dashboards<br/>+ centralized logs"]
+    B --> C["Many services<br/>full three-pillar setup<br/>— metrics, logs, AND<br/>distributed tracing"]
+    C --> D["Massive scale<br/>sampling and cost management<br/>become their own discipline —<br/>can't store/trace everything forever"]
+```
+
+## Failure scenarios
+
+> [!bug] What actually happens
+> - **A trace ID isn't propagated across an async boundary** (a message queue hop, a fire-and-forget background job): the trace silently breaks into two disconnected traces instead of one continuous one — a real, common gap specifically at exactly the async boundaries [[CS Fundamentals/07 - Architecture and Deployment Patterns/Event-Driven Architecture|Event-Driven Architecture]] introduces, not a tracing-tool bug.
+> - **Log ingestion volume outpaces the pipeline's capacity:** per [[HLD/20 - Design a Log Aggregation and Monitoring System/Design a Log Aggregation and Monitoring System|the Log Aggregation chapter's]] own back-pressure problem — logs queue up or get dropped, and the observability system itself becomes the thing that's failing during an incident, exactly when it's needed most.
+> - **Alert fatigue from too many low-value metrics:** real, actionable alerts get lost in noise from alerts nobody actually acts on — a genuine, common cause of a real incident being missed despite technically being "monitored."
+
+## Monitoring
+
+> [!info] Monitoring the observability pipeline itself
+> **Ingestion lag of the pipeline itself** — if metrics/logs/traces arrive minutes late, they're describing the past, not informing a live incident response. **Trace sampling rate vs. actual error-request coverage** — a low sampling rate that happens to under-sample exactly the failing requests defeats tracing's purpose; error requests are worth sampling at a much higher rate than healthy ones. **Metric cardinality** — unbounded label values (e.g., a metric labeled by raw user ID) can silently explode storage cost and query performance without any single change looking obviously wrong.
+
+## Common mistakes
+
+> [!warning] Real, recurring errors
+> 1. **Not propagating trace ID across async/queue boundaries** — the Failure Scenarios entry above; the most common real gap in an otherwise-complete tracing setup.
+> 2. **Treating logs as a substitute for metrics or traces** — the "none substitutes for the others" warning above, worth repeating as the chapter's central point.
+> 3. **Unbounded metric cardinality** — adding a high-cardinality label (user ID, request ID) to a metric instead of a trace, where high-cardinality data actually belongs.
+
 ---
 
 ## Interview Q&A
+
+> [!info] Leveled by seniority
+> **Beginner:** "What's the difference between metrics, logs, and traces?" — the three-pillar table above; each answers a genuinely different question. **Intermediate:** "Why is a trace ID propagated via an HTTP header instead of looked up some other way?" — it needs to travel with the request itself across every service boundary, with no shared external state required to correlate spans later. **Senior:** "A distributed trace stops partway through a request that you know continues further — diagnose it." — expects checking for an unpropagated trace ID across an async/queue hop, per the Failure Scenarios above, the most common real cause of a broken trace. **Staff:** "Design a tracing sampling strategy for a system where 99% of requests are healthy but the 1% that fail matter most." — expects a much higher sampling rate for slow/error requests specifically (tail-based or error-biased sampling) rather than a flat percentage across all requests. **Architect:** "How would you control observability cost as a platform grows to thousands of services, without losing the ability to debug real incidents?" — expects a layered strategy: cheap, always-on aggregate metrics for detection; selectively higher-fidelity logging and trace sampling triggered specifically around detected anomalies, rather than uniformly high-fidelity collection everywhere at all times.
 
 > [!question]- Why can't logs alone answer "why was this specific request slow" in a distributed system?
 > Each service's logs only show that service's own view — without a shared trace ID linking them, there's no way to know which log lines across ten different services' log files actually belong to the *same* originating request, or to see the timing relationship between them. Tracing solves exactly this correlation problem, which logs alone structurally can't.

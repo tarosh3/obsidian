@@ -95,9 +95,40 @@ Encryption adds CPU overhead — though modern CPUs have dedicated instructions 
 > [!success] Direct connections
 > [[CS Fundamentals/08 - Security/Authentication & Authorization|Authentication & Authorization]] — mTLS and short-lived credentials, both referenced above. [[CS Fundamentals/02 - Networking/HTTP Evolution & DNS Resolution|HTTP Evolution & DNS Resolution]] — the TLS handshake mentioned briefly there is the full mechanism explained here. [[CS Fundamentals/02 - Networking/API Gateway|API Gateway]] — the standard TLS termination point in most architectures.
 
+## Scaling: one service's TLS to a full zero-trust mesh
+
+```mermaid
+flowchart TD
+    A["Single service<br/>TLS terminated at the<br/>load balancer only"] --> B["Growing services<br/>mTLS added between the<br/>most sensitive internal paths"]
+    B --> C["Many services<br/>full internal mesh — EVERY hop<br/>mTLS, zero trust as the default"]
+    C --> D["Massive scale<br/>certificate issuance/rotation itself<br/>needs automation — short-lived certs,<br/>an automated internal CA"]
+```
+
+## Failure scenarios
+
+> [!bug] What actually happens
+> - **An encryption key is lost:** not a leak — data protected by it becomes **permanently unrecoverable**, per the Tradeoffs section above; key-management systems exist specifically to make this scenario rare, not to make losing a key survivable.
+> - **A certificate expires unnoticed:** every mTLS call depending on it starts failing cluster-wide — a real, common *outage* cause distinct from a security breach, and often more disruptive in practice since it fails closed, all at once.
+> - **A long-lived secret leaks but hasn't rotated yet:** it keeps working for an attacker for as long as its lifetime allows — the entire justification for automated, short-lived rotation over a "rotate manually when we remember" policy.
+
+## Monitoring
+
+> [!info] What to watch
+> **Certificate expiry countdown**, per certificate — the direct, actionable signal that prevents the expiry failure scenario above from ever becoming a surprise outage. **Secrets-access audit log anomalies** — an unusual access pattern (wrong time, wrong service, wrong volume) is a real, early compromise signal. **TLS/mTLS handshake failure rate** — a sudden spike usually means an expired or misconfigured certificate somewhere in the mesh, not a network problem.
+
+## Common mistakes
+
+> [!warning] Real, recurring errors
+> 1. **Long-lived, non-rotating certificates or secrets** — directly increases the blast-radius window of the failure scenarios above.
+> 2. **Hardcoded credentials in source control** — the Secrets Management section's central warning, worth repeating as the single most common real incident category.
+> 3. **Treating "internal" traffic as implicitly trusted** — the exact old perimeter-model mistake zero trust exists to eliminate; a service inside the network is not automatically a safe caller.
+
 ---
 
 ## Interview Q&A
+
+> [!info] Leveled by seniority
+> **Beginner:** "What's the difference between encryption at rest and in transit?" — at rest protects stored data (e.g., a stolen disk); in transit protects data moving across a network (e.g., an eavesdropper). **Intermediate:** "Why does TLS use both symmetric and asymmetric encryption?" — asymmetric solves key distribution over an untrusted channel; symmetric is fast enough for the actual data — a deliberate hybrid, covered precisely above. **Senior:** "mTLS calls between two internal services suddenly start failing everywhere — diagnose it." — expects checking certificate expiry first, per the Failure Scenarios above, before assuming a network or code-level bug. **Staff:** "Design a secrets-rotation strategy for a platform with 200 internal services, where a single leaked secret shouldn't remain useful for more than an hour." — expects short-lived, automatically-rotated secrets issued by a central secrets manager, with rotation scheduled well under that one-hour blast-radius target, rather than a manual or infrequent rotation cadence. **Architect:** "How would you migrate a large, existing system from the perimeter model to zero trust without a risky big-bang cutover?" — expects an incremental approach: start mTLS on the most sensitive internal paths first (the Scaling section's second stage), expanding coverage service by service, rather than attempting a full-mesh cutover in one release.
 
 > [!question]- Why not just use asymmetric encryption for everything, since it's more secure?
 > It isn't that asymmetric is "more secure" in a way that matters here — it's dramatically slower computationally for bulk data. TLS's hybrid approach gets asymmetric's key-distribution benefit (no shared secret needs to travel over the network) *and* symmetric's speed, by using each for the part of the problem it's actually good at.

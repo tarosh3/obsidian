@@ -91,9 +91,40 @@ SOLID isn't five independent rules — it's five angles on the same underlying g
 > [!warning] SOLID is a direction, not a target to maximize
 > Splitting a class into ten single-method classes "for SRP" or an interface into ten one-method interfaces "for ISP" can produce code that's technically compliant and practically unreadable — more files to navigate, more indirection to trace, for a system too small to ever need that flexibility. The real skill being tested in an interview isn't reciting all 5 principles — it's recognizing *when a specific violation is actually going to cause pain* (a new requirement is clearly coming that the current design can't absorb without a rewrite) versus over-engineering flexibility nobody asked for.
 
+## Scaling: one file to a large, multi-team codebase
+
+```mermaid
+flowchart TD
+    A["Single file/script<br/>SOLID barely matters —<br/>the whole thing fits in one head"] --> B["Growing module<br/>SRP/OCP start mattering as<br/>the file gets touched by more changes"]
+    B --> C["Multi-team codebase<br/>ISP/DIP prevent teams from being<br/>coupled to each other's internal details"]
+    C --> D["Large legacy system<br/>accumulated violations compound —<br/>a 'simple' change requires touching<br/>a dozen unrelated-seeming files"]
+```
+
+## Failure scenarios — concrete consequences of each violation
+
+> [!bug] What actually happens
+> - **SRP violation:** merge conflicts spike, since unrelated changes (pricing vs. spot allocation) keep landing in the same file — one team's change to pricing risks silently regressing another team's spot-allocation logic sharing the same blast radius.
+> - **OCP violation:** every new case (a new vehicle type, a new pricing tier) requires touching and re-testing existing, already-working code — regression risk compounds with every single addition instead of staying isolated to the new case.
+> - **DIP violation:** unit testing a high-level module requires standing up its concrete low-level dependency for real — a fast, isolated unit test quietly becomes a slow, brittle integration test, and the team often doesn't notice until test suite runtime has crept up significantly.
+
+## Monitoring — code-health signals
+
+> [!info] What to watch
+> **File/function size trend over time** — steady growth in a single file is a direct, visible signal of SRP erosion, worth flagging in review before it compounds. **Churn from unrelated features landing in the same file** — a strong, concrete signal of hidden coupling that a diagram alone wouldn't reveal. **Test setup complexity / mocking difficulty** — a unit test needing an increasingly elaborate setup to isolate the thing under test is a direct, practical signal of a DIP violation, not just an abstract code-smell.
+
+## Common mistakes
+
+> [!warning] Real, recurring errors
+> 1. **Over-applying SOLID into unreadable over-abstraction** — the "over-applying SOLID backfires" section above, the chapter's own central warning.
+> 2. **Applying full SOLID rigor to a one-off script or throwaway prototype** — pure overhead when the code will never be extended or maintained past its immediate use.
+> 3. **Treating Liskov Substitution as purely about class inheritance** — the most commonly missed violation, per the Q&A below: interface implementations that technically satisfy a method signature but silently break an implicit behavioral contract are just as real a violation as a bad subclass.
+
 ---
 
 ## Interview Q&A
+
+> [!info] Leveled by seniority
+> **Beginner:** "What does the 'S' in SOLID stand for and what does it mean?" — Single Responsibility: a class/module should have exactly one reason to change. **Intermediate:** "How do OCP and SRP work together?" — SRP keeps a piece small enough to reason about; OCP is what that separation *enables* — a well-isolated piece can be extended without touching its neighbors. **Senior:** "A team's unit tests have become slow and brittle over the last year — diagnose it." — expects checking for a DIP violation, per the Failure Scenarios above: concrete dependencies baked directly into high-level modules force tests to drag in real, slow dependencies instead of substitutable fakes. **Staff:** "Design the interface boundaries for a payment system where 5 teams each own a different payment provider integration." — expects ISP-driven narrow, provider-specific interfaces plus DIP (each team's module depends on an abstraction, not on another team's concrete implementation), preventing any one team's internal changes from breaking another team's code. **Architect:** "How would you decide whether a SOLID violation in a legacy codebase is worth fixing now versus leaving alone?" — expects weighing the Failure Scenarios' concrete costs (merge-conflict frequency, regression rate, test brittleness) against the refactor's cost and risk — a genuine judgment call, not a reflexive "always refactor toward SOLID."
 
 > [!question]- Give a violation of each principle and how you'd fix it.
 > Walk through the [[LLD/01 - Design a Parking Lot/Design a Parking Lot|Parking Lot chapter's]] bad draft directly — it names and fixes an SRP violation, an OCP violation, and a DIP violation with the exact code responsible for each, in sequence, in one refactor.

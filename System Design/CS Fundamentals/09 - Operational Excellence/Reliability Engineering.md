@@ -66,9 +66,40 @@ flowchart TD
 > [!success] Direct connections
 > [[Glossary/SLA vs SLO vs SLI|SLA vs SLO vs SLI]] — the definitions this chapter's error-budget mechanism is built on top of. [[CS Fundamentals/06 - Distributed Systems/Resilience Patterns|Resilience Patterns]] — the code-level tools (circuit breakers, retries) that directly help protect the error budget from being consumed by preventable failures.
 
+## Scaling: one team's SLO to an org-wide reliability practice
+
+```mermaid
+flowchart TD
+    A["Single service,<br/>informal reliability<br/>'we try to keep it up',<br/>no quantified target"] --> B["One team,<br/>formal SLO + error budget<br/>ship-fast vs freeze<br/>decided by a real policy"]
+    B --> C["Many teams<br/>standardized SLO framework<br/>applied consistently org-wide"]
+    C --> D["Massive scale<br/>dedicated SRE org, escalation<br/>tiers, cross-team error-budget<br/>dependencies tracked explicitly"]
+```
+
+## Failure scenarios
+
+> [!bug] What actually happens
+> - **An SLO is set unrealistically tight** (99.999% for a non-critical internal tool): the team's error budget is perpetually exhausted, freezing shipping velocity indefinitely for a reliability level users never actually needed — a real, self-inflicted cost from setting the target without weighing it against actual business need.
+> - **The postmortem process gets skipped under delivery pressure:** the systemic cause behind an incident goes unaddressed, and the identical incident recurs later — the entire value of a blameless postmortem is lost the moment it's treated as optional busywork rather than a required practice.
+> - **Toil is left unchecked:** the team spends effectively 100% of its time firefighting, with zero time left for the automation work that would actually reduce future toil — a real, self-reinforcing trap that gets worse, not better, without a deliberate intervention to break the cycle.
+
+## Monitoring
+
+> [!info] What to watch
+> **Error budget burn rate, not just remaining budget** — a fast burn early in the period is a fundamentally different, more urgent signal than the same total consumption spread evenly across it; burn *rate* catches a developing problem before the budget is fully gone. **Toil as a percentage of team time** — the direct, quantified check against the eviction-style trap in the Failure Scenarios above. **Postmortem action-item completion rate** — a postmortem that identifies causes but whose follow-up actions never actually ship isn't really preventing recurrence.
+
+## Common mistakes
+
+> [!warning] Real, recurring errors
+> 1. **Setting an SLO that doesn't match actual user/business need** — too tight wastes velocity on invisible-to-users reliability; too loose fails to protect what users actually depend on.
+> 2. **Treating the error-budget policy as optional under pressure** — a policy that gets overridden "just this once" whenever it's inconvenient provides no real guarantee at all, identical in practice to having no policy.
+> 3. **Postmortems producing findings but no completed follow-up action** — the completion-rate metric above exists specifically because this gap is common and easy to miss without explicitly tracking it.
+
 ---
 
 ## Interview Q&A
+
+> [!info] Leveled by seniority
+> **Beginner:** "What's an error budget?" — the quantified amount of acceptable unreliability an SLO implies, spendable on shipping risk. **Intermediate:** "Why are postmortems 'blameless'?" — punishing individuals teaches people to hide problems, making future incidents more likely and less visible; the goal is systemic fixes, not blame. **Senior:** "A team's error budget is exhausted every single quarter without fail — diagnose it." — expects checking whether the SLO itself is set unrealistically tight relative to actual need, per the Failure Scenarios above, rather than assuming the team is simply bad at reliability. **Staff:** "Design an error-budget policy for a platform where one team's dependency failures repeatedly burn another team's budget." — expects tracking cross-team error-budget dependencies explicitly (the Scaling section's final stage), so a downstream team isn't unfairly penalized for an upstream team's reliability problem. **Architect:** "How would you introduce SRE practices to an organization that currently has none?" — expects starting with SLIs/SLOs on the highest-impact service first (not org-wide all at once), proving the error-budget mechanism resolves a real, existing speed-vs-stability conflict there, before expanding the practice further.
 
 > [!question]- What happens in practice when a team's error budget is exhausted mid-quarter?
 > The team halts non-essential risky deploys (new features, large refactors) and reprioritizes toward fixing the underlying reliability issues consuming the budget — this is a real, enforced policy in mature SRE practices, not just guidance, precisely because an unenforced policy is no different from having no policy at all.

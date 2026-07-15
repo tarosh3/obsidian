@@ -72,7 +72,7 @@ Simulates realistic — or deliberately higher-than-realistic — traffic agains
 ## The premature-optimization trap, precisely
 
 > [!bug] A real, well-documented, avoidable mistake
-> Optimizing code that *isn't* the actual bottleneck wastes engineering time and often makes the code more complex and fragile, for zero real-world benefit — the theoretically-slow-looking part of a system is frequently not where time is actually spent once you measure. [[CS Fundamentals/Computer Architecture/CPU, Memory & Cache Hierarchy|The Computer Architecture chapter's]] array-vs-linked-list example is a concrete instance of this same lesson from the other direction: theoretical complexity analysis alone can point you at the wrong conclusion; only measurement (profiling, benchmarking) reveals what's actually true on real hardware. **Profile first, then optimize the bottleneck the data actually identifies** — never the one intuition suggested.
+> Optimizing code that *isn't* the actual bottleneck wastes engineering time and often makes the code more complex and fragile, for zero real-world benefit — the theoretically-slow-looking part of a system is frequently not where time is actually spent once you measure. [[CS Fundamentals/00 - Computer Architecture/CPU, Memory & Cache Hierarchy|The Computer Architecture chapter's]] array-vs-linked-list example is a concrete instance of this same lesson from the other direction: theoretical complexity analysis alone can point you at the wrong conclusion; only measurement (profiling, benchmarking) reveals what's actually true on real hardware. **Profile first, then optimize the bottleneck the data actually identifies** — never the one intuition suggested.
 
 ## Tradeoffs
 
@@ -81,11 +81,42 @@ Profiling and load testing both carry real overhead and require realistic-enough
 ## Where this shows up later
 
 > [!success] Direct connections
-> [[CS Fundamentals/Computer Architecture/CPU, Memory & Cache Hierarchy|CPU, Memory & Cache Hierarchy]] — the array-vs-linked-list example is exactly the "measure, don't assume" lesson applied to a specific, concrete case. [[00 - Start Here/100 System Design Interview Questions|100 System Design Interview Questions]] — the back-of-envelope estimation entries this chapter's load testing empirically validates. [[CS Fundamentals/09 - Operational Excellence/Observability - Metrics, Logs and Traces|Observability]] — the P99 latency metrics load testing watches are the same metrics pillar covered there.
+> [[CS Fundamentals/00 - Computer Architecture/CPU, Memory & Cache Hierarchy|CPU, Memory & Cache Hierarchy]] — the array-vs-linked-list example is exactly the "measure, don't assume" lesson applied to a specific, concrete case. [[00 - Start Here/100 System Design Interview Questions|100 System Design Interview Questions]] — the back-of-envelope estimation entries this chapter's load testing empirically validates. [[CS Fundamentals/09 - Operational Excellence/Observability - Metrics, Logs and Traces|Observability]] — the P99 latency metrics load testing watches are the same metrics pillar covered there.
+
+## Scaling: one-off profiling to continuous performance engineering
+
+```mermaid
+flowchart TD
+    A["One slow function,<br/>profiled once<br/>reactive, ad hoc"] --> B["Regular benchmarking<br/>in CI<br/>catches regressions before<br/>they reach production"]
+    B --> C["Load-testing suite<br/>gates releases<br/>a release can't ship until it<br/>clears the known breaking-point margin"]
+    C --> D["Continuous production<br/>profiling at scale<br/>live sampling/flame graphs from<br/>real traffic, not just synthetic tests"]
+```
+
+## Failure scenarios
+
+> [!bug] What actually happens
+> - **A load test uses an unrealistic traffic pattern:** already named in Tradeoffs above — it passes, produces false confidence, and the system still breaks under real production traffic's actual mix of hot keys and read/write ratios.
+> - **Profiling itself distorts the measurement** (the observer effect from heavy instrumentation): the "fix" a team ships based on distorted numbers can target the wrong thing entirely — a real, specific risk from the instrumentation-vs-sampling tradeoff named above, not just a theoretical concern.
+> - **A regression ships because no benchmark caught it:** without benchmarking gating CI, a slow-down in one specific operation goes unnoticed until it compounds with others into a genuinely slow release — by which point isolating *which* change caused it is far harder than catching it at the time.
+
+## Monitoring
+
+> [!info] What to watch
+> **Production P50/P99 latency trend over time** — the metrics pillar from [[CS Fundamentals/09 - Operational Excellence/Observability - Metrics, Logs and Traces|Observability]], tracked specifically to catch gradual regressions a single load test can't. **Load-test breaking-point trend, release over release** — is the system's actual ceiling rising with capacity work, or quietly eroding as new code adds overhead. **Benchmark results in CI, tracked historically** — a single benchmark run in isolation doesn't reveal a regression; the trend across commits does.
+
+## Common mistakes
+
+> [!warning] Real, recurring errors
+> 1. **Optimizing before profiling** — the premature-optimization trap above, the chapter's central warning.
+> 2. **Load-testing with an unrealistic traffic pattern** — the Failure Scenarios entry above; a passing load test isn't meaningful if its traffic doesn't resemble production.
+> 3. **Trusting theoretical complexity analysis alone, without measuring on real hardware** — the [[CS Fundamentals/00 - Computer Architecture/CPU, Memory & Cache Hierarchy|Computer Architecture chapter's]] array-vs-linked-list lesson, elevated here as a general discipline, not a one-off example.
 
 ---
 
 ## Interview Q&A
+
+> [!info] Leveled by seniority
+> **Beginner:** "What's the difference between profiling, benchmarking, and load testing?" — the three-tools table above; each answers a genuinely different scope of question. **Intermediate:** "Why profile before optimizing instead of trusting intuition about what's slow?" — intuition is frequently wrong about where time is actually spent; profiling replaces a guess with measurement. **Senior:** "A load test passed cleanly, but the system fell over in production under real traffic — diagnose it." — expects checking whether the load test's traffic pattern actually resembled production's real mix (hot keys, read/write ratio), per the Failure Scenarios above, rather than trusting a passing synthetic test as sufficient proof. **Staff:** "Design a performance-regression-prevention strategy for a team shipping multiple times a day." — expects benchmark gating in CI for known hot operations, plus a periodically-refreshed load test, so regressions are caught at commit time rather than discovered in production days or weeks later. **Architect:** "How would you build a culture where performance work happens proactively, not just after an incident?" — expects institutionalizing the Monitoring section's trend tracking (latency trend, breaking-point trend) as a visible, regularly-reviewed signal, so performance degradation is caught and addressed while gradual, rather than allowed to compound silently until it becomes an incident.
 
 > [!question]- Why is "premature optimization is the root of all evil" not an argument against ever optimizing?
 > The full point is sequencing, not avoidance — optimize *after* measuring identifies a real bottleneck, not *before*, based on a guess. Knuth's quote is routinely misquoted as "don't optimize," when the actual lesson is "don't optimize *blindly*" — measured, targeted optimization of an identified bottleneck is exactly what performance engineering is for.
@@ -104,4 +135,4 @@ Profiling and load testing both carry real overhead and require realistic-enough
 - Estimation (back-of-envelope) predicts; load testing empirically validates. Complementary, not redundant.
 
 ---
-*Related: [[CS Fundamentals/00 - Learning Path|CS Fundamentals Learning Path]] · [[CS Fundamentals/Computer Architecture/CPU, Memory & Cache Hierarchy|CPU, Memory & Cache Hierarchy]] · [[CS Fundamentals/09 - Operational Excellence/Observability - Metrics, Logs and Traces|Observability]] · [[00 - Start Here/100 System Design Interview Questions|100 System Design Interview Questions]]*
+*Related: [[CS Fundamentals/00 - Learning Path|CS Fundamentals Learning Path]] · [[CS Fundamentals/00 - Computer Architecture/CPU, Memory & Cache Hierarchy|CPU, Memory & Cache Hierarchy]] · [[CS Fundamentals/09 - Operational Excellence/Observability - Metrics, Logs and Traces|Observability]] · [[00 - Start Here/100 System Design Interview Questions|100 System Design Interview Questions]]*

@@ -158,9 +158,40 @@ status: reference-quality
 | Iterator | Behavioral | Cheat-sheet only (Go-native via `range`) |
 | Interpreter | Behavioral | Cheat-sheet only (Calendar RRULE parallel) |
 
+## Scaling: recognizing pattern needs as a codebase grows
+
+```mermaid
+flowchart TD
+    A["Small codebase<br/>patterns rarely needed —<br/>direct code is clearer than<br/>the pattern's own overhead"] --> B["Growing complexity<br/>Strategy/Factory emerge naturally<br/>to avoid duplicating near-identical code"]
+    B --> C["Large system<br/>Facade/Adapter needed at<br/>integration boundaries between subsystems"]
+    C --> D["Mature platform<br/>misapplied patterns become real<br/>technical debt, needing conscious pruning<br/>— not every pattern earns its keep forever"]
+```
+
+## Failure scenarios — misapplication in practice
+
+> [!bug] What actually happens
+> - **Reaching for a pattern name before identifying a real problem shape:** the exact anti-pattern this chapter's own opening tip warns against — a requirement gets forced into a pattern's shape rather than the pattern being recognized from the requirement's actual shape.
+> - **Singleton hiding untestable global state:** already named in the Singleton entry above — a mutable global "god object" makes unit tests unable to swap in a fake instance, and can silently mask a real concurrency bug if the "single" instance isn't actually thread-safe.
+> - **Memento-shaped snapshotting used where Command's cheaper delta storage would do:** exactly the tradeoff [[LLD/15 - Design a Text Editor/Design a Text Editor|the Text Editor chapter]] explicitly considered and rejected — a textbook-obvious pattern isn't automatically the right fit for a specific cost profile.
+
+## Monitoring — code-review and maintainability signals
+
+> [!info] What to watch (not runtime metrics — code-health signals)
+> **Growing indirection depth** — a stack trace that takes longer to follow with each added layer is a real, noticeable maintainability cost from pattern layering, worth weighing against the flexibility gained. **"Just in case" abstractions with only one real implementation ever built** — a strong signal a pattern was applied for anticipated flexibility that never actually materialized. **Pattern names appearing in PR review comments without a concrete problem being cited** — a sign the pattern is being pattern-matched by keyword rather than by the actual problem shape it solves.
+
+## Common mistakes
+
+> [!warning] Real, recurring errors
+> 1. **Pattern-name-first instead of problem-shape-first** — the chapter's own central, opening warning, worth repeating as the single most common mistake.
+> 2. **Forcing a GoF pattern into Go where the language already has a native idiom** — Iterator via `range`, Builder via functional options, both named above; reaching for the classic hand-rolled version when Go's idiom already covers the need adds unnecessary ceremony.
+> 3. **Confusing structurally similar patterns** — Decorator vs. Proxy, Strategy vs. State, both covered in the Interview Q&A below; genuinely easy to conflate without a precise distinguishing question in mind.
+
 ---
 
 ## Interview Q&A
+
+> [!info] Leveled by seniority
+> **Beginner:** "What's the difference between a creational, structural, and behavioral pattern?" — creational controls object creation, structural composes objects into larger structures, behavioral governs how objects communicate. **Intermediate:** "Why does this book emphasize recognizing a pattern's 'shape' over memorizing its name?" — real interview requirements rarely name a pattern directly; the strongest answer comes from recognizing the underlying problem shape and naming the pattern as a consequence. **Senior:** "A codebase has ten single-method classes, each implementing its own single-method interface, and the team says it's 'following SOLID and using patterns correctly' — assess it." — expects recognizing the over-application warning above: technically compliant, practically unreadable, added indirection for flexibility the system was never going to need. **Staff:** "Design the pattern usage for a payment system integrating 5 different payment providers with different APIs." — expects Adapter at the integration boundary (each provider wrapped behind one consistent interface) combined with Strategy if provider selection itself needs to vary at runtime — two patterns solving two genuinely different sub-problems, not one pattern stretched to cover both. **Architect:** "How would you audit a large, mature codebase for pattern misapplication accumulated over years?" — expects using the Monitoring section's signals (indirection depth, single-implementation abstractions, unjustified pattern references) as a concrete, non-subjective starting point, rather than a purely opinion-based architecture review.
 
 > [!question]- How do you decide between Strategy and State when both involve swappable behavior objects?
 > Strategy is chosen by the *caller* and typically stays fixed for an object's lifetime (which pricing rule applies to this parking lot). State is driven by the *object's own internal transitions* and changes itself over time in response to events (an order moving from PLACED to DELIVERED). If the "which implementation" decision is external and stable, it's Strategy; if it's internal and changes as a direct consequence of the object's own behavior, it's State.
