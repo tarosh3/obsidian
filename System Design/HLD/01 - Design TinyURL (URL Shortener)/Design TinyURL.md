@@ -72,15 +72,38 @@ status: reference-quality
 > [!tip] SQL vs NoSQL — the actual reasoning, not the reflex
 > **NoSQL (DynamoDB/Cassandra-style)** is the more natural default here: horizontal scaling is built in, the data model has no relationships to model, and the access pattern is pure key lookup. **SQL (sharded Postgres/MySQL)** is an equally valid answer *if you can show the sharding strategy* — shard by a hash of the short code, and a relational DB handles 30B rows across enough shards without difficulty. Either answer is correct in an interview; picking one and being unable to explain how it scales is the actual failure mode.
 
-**Need to generate the short code itself.** This is the part of TinyURL interviewers actually care about — three real approaches, each with a real tradeoff:
+**Need to generate the short code itself — the part interviewers actually care about.**
 
-| Approach | How it works | Tradeoff |
+> [!example] Layman framing first
+> Picture a hotel with hundreds of front desks (app servers) all checking guests in at once, and every guest needs a **unique room number** (short code) — nobody can be handed a room number someone else already holds. The hotel has two bad options and a few good ones: making every desk phone a single central operator for *every* guest (too slow, one operator becomes the bottleneck), or letting every desk just make up numbers freely and hope nobody clashes (works until it doesn't, and checking for a clash after the fact is real, ongoing work). Everything below is different, real ways hotels — and real distributed systems — actually solve this.
+
+### The real-world landscape — 4 named approaches, what actually uses each
+
+| Approach | How it works | Who this is actually right for |
 |---|---|---|
-| **Random + collision check** | Generate a random 7-char base62 string, check the DB for existing use, retry on collision. | Simple to reason about, but collision probability rises as the keyspace fills, and a naive check-then-insert has a race condition unless backed by a DB unique constraint. |
-| **Counter + base62 encode** | A monotonically increasing global counter; encode each new integer value into base62 to get the code. | Zero collisions by construction — no check needed at all. The counter itself can become a bottleneck/single point of failure at very high write volume (mitigated below). |
-| **Hash-based (MD5/SHA of the long URL)** | Take the first 7 chars of a hash of the long URL. | Deterministic — the same long URL always maps to the same short code, which gives free deduplication. But hash collisions are real at 7 chars and need a fallback (append a salt and retry), and dedup requires an index on the long URL column too. |
+| **Counter + range allocation, base62-encoded** | A shared counter hands out ID *blocks* to servers; each server encodes its own local integers to base62. | The standard, textbook-correct answer for a URL shortener specifically — zero collisions by construction, simplest to reason about and defend in an interview. |
+| **Random 7-char generation + collision check** | Draw 7 random base62 characters directly; check for a clash (cheaply, via a Bloom filter) before committing. | What many real production link shorteners actually prefer — critically, it avoids ever exposing a **guessable, enumerable sequence** (see the security note below), a real reason to pick this over a plain counter. |
+| **Hash-based (SHA-256 of the long URL, truncated)** | Hash the long URL, base62-encode the hash, take the first 7 characters. | Real systems that want **free deduplication** — the same long URL always produces the same short code, without a separate dedup index. Git's short commit hashes are the same underlying idea, publicly well-known. |
+| **Snowflake-style local ID generation** | Every server builds its own ID locally from timestamp + machine ID + sequence, with zero coordination. | Real, and used at real companies (Twitter's Tweet IDs, Instagram's photo IDs, Discord's message/user IDs are all public, well-documented examples) — but for **internal, time-sortable numeric IDs at massive fleet scale**, not for handing a user a compact public code. Explained in full below, including exactly why it doesn't fit 7 characters without modification.
 
-**The counter-based approach is the strongest default answer** — it's the only one that guarantees uniqueness *without* a check-then-write race condition. The base62 encoding itself is worth writing out precisely:
+> [!warning] Sequential IDs are a real, named security concern — not just a style preference
+> A plain incrementing counter, base62-encoded, means anyone can enumerate **every URL your service has ever shortened** just by requesting code `1`, `2`, `3`, ... in order — a genuine data-leak vector for a service where the "long URL" behind a short link might itself be sensitive (a private document link, an unlisted video, a password-reset flow). This is the concrete, real reason many production systems choose random generation over a raw counter, even though the counter is simpler to build and defend on paper.
+
+### How each approach actually produces exactly 7 characters
+
+**1. Counter + base62 — the code length grows on its own, it's never padded.** A base62 encoding's length is simply however many base62 "digits" the number needs — the same way `9` is one decimal digit and `10` needs two. Watching the actual growth makes this concrete:
+
+| Counter value | Base62 code | Length |
+|---|---|---|
+| `0` | `0` | 1 |
+| `61` | `Z` | 1 |
+| `62` | `10` | 2 |
+| `3,843` | `ZZ` | 2 |
+| `3,844` | `100` | 3 |
+| `238,327` | `ZZZ` | 3 |
+| `3,521,614,606,207` (= `62⁷ − 1`) | `ZZZZZZZ` | **7** |
+
+The code only reaches 7 characters once the counter genuinely approaches `62⁷ ≈ 3.5 trillion` — which is *exactly* why "aim for 7 characters" (Step 2) and "counter capped near `62⁷`" are the same design decision, not two separate ones. This is the encoder already shown above:
 
 ```go
 const base62Alphabet = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -111,19 +134,25 @@ func DecodeBase62(code string) uint64 {
 }
 ```
 
-**The single-counter bottleneck, solved.** A naive `SELECT counter + 1` shared by every app server serializes all writes through one row — a real bottleneck at 200+ writes/sec and a single point of failure. The standard fix: **range allocation**. A small, highly-available ID-allocator service hands each app server a *block* of, say, 1,000 IDs at a time (e.g. via an atomic increment in Redis/ZooKeeper). Each app server then generates codes from its local block without contacting the allocator again until the block is exhausted — turning "one contended counter per write" into "one contended counter per 1,000 writes," while still guaranteeing global uniqueness.
+**The single-counter bottleneck, solved.** A naive `SELECT counter + 1` shared by every app server serializes all writes through one row — a real bottleneck at 200+ writes/sec and a single point of failure. The standard fix: **range allocation**. A small, highly-available ID-allocator service hands each app server a *block* of, say, 1,000 IDs at a time (e.g. via an atomic increment in Redis/ZooKeeper). Each app server then generates codes from its local block without contacting the allocator again until the block is exhausted — turning "one contended counter per write" into "one contended counter per 1,000 writes," while still guaranteeing global uniqueness, and every generated ID still base62-encodes exactly as the table above shows.
 
-> [!info] Snowflake — the fully-local alternative, explained precisely
-> Range allocation still depends on a shared allocator *eventually* — Twitter's **Snowflake** scheme removes that dependency entirely by generating every ID **locally, with zero network calls**. Each 64-bit ID packs three fields: **41 bits of timestamp** (milliseconds since a custom epoch, ~69 years of range), **10 bits of machine ID** (up to 1,024 distinct machines, assigned at startup), and **12 bits of sequence number** (up to 4,096 IDs per machine per millisecond, incremented for IDs generated in the same millisecond). Two different machines can never collide, since their machine-ID bits differ; the same machine can never collide with itself, since the sequence number increments within a millisecond and the timestamp advances between them. No coordination, no shared counter, no round-trip per ID.
+**2. Random generation — draw 7 characters directly, no encoding step at all.** Unlike the counter, there's no integer to encode — just pick 7 symbols independently from the 62-character alphabet (`code[i] = base62Alphabet[rand.Intn(62)]`, 7 times). This always produces exactly 7 characters, every time, with no growth curve to reason about — the tradeoff moves entirely into collision handling instead.
+
+> [!info] The real collision math, worked precisely
+> Two different questions get conflated here, and only one of them matters in practice. **"If I generated all 30 billion of this system's 5-year total blindly, with zero checking, would any two coincide?"** — yes, virtually certainly (the keyspace is `62⁷ ≈ 3.52 × 10¹²`; the birthday-paradox math for 30 billion draws into that space makes a collision essentially guaranteed). This is exactly why blind random generation is never used *alone*. **The question that actually matters — "what's the retry rate for a system that checks before committing?"** — is just the keyspace's **fill ratio**: at the system's full 5-year capacity of 30 billion codes, fill ratio is `30×10⁹ / 3.52×10¹² ≈ 0.85%` — meaning roughly 1 in 118 random draws needs a retry, even at *maximum* lifetime capacity. Early in the system's life (say, 1 billion codes issued), it's `≈ 0.028%` — a retry is rare enough to be a non-issue.
 >
-> Full bit-layout diagram and a complete, compilable Go implementation live in [[LLD/20 - Design a Distributed ID Generator/Design a Distributed ID Generator|Design a Distributed ID Generator]] — worth reading end to end if Snowflake comes up as its own follow-up question.
+> Checking this cheaply is exactly what [[CS Fundamentals/06 - Distributed Systems/Bloom Filter and Probabilistic Membership|a Bloom Filter]] is for: keep an in-memory, space-efficient "have I probably issued this code already" check in front of the database, so the ~99%+ of draws that are genuinely new never even touch the DB. A Bloom filter's false positives just cost an occasional needless retry (cheap); it never produces a false negative, so a real collision can never silently slip through — the database's `UNIQUE` constraint on the short-code column remains the final, authoritative guarantee regardless of what the Bloom filter says.
+
+**3. Hash-based — same 7-character truncation, same collision math, plus a real dedup benefit.** Take a cryptographic hash (SHA-256) of the long URL, base62-encode the hash bytes, and keep only the first 7 characters. Truncating to 7 characters throws away almost all of SHA-256's 256 bits, collapsing the *effective* collision space down to the identical `62⁷` keyspace random generation has — so the retry math above applies unchanged. The genuine upside over random generation: hashing is **deterministic** — the same long URL always produces the same short code, which means shortening the same URL twice for free returns the existing code instead of minting a wasteful duplicate, with no separate "have I seen this URL before" index needed. The real cost: a genuine hash collision (two *different* long URLs landing on the same truncated 7 characters) needs the same salt-and-retry fallback random generation needs, so the "free dedup" benefit is real but doesn't remove the collision-handling work — it just adds a nice side effect on top of it.
+
+**4. Snowflake — the right tool for a different, related problem, explained precisely.** Twitter's **Snowflake** scheme generates every ID **locally, with zero network calls, zero shared counter** — the property that makes it genuinely attractive at massive scale. Each 64-bit ID packs three fields: **41 bits of timestamp** (milliseconds since a custom epoch, ~69 years of range), **10 bits of machine ID** (up to 1,024 distinct machines, assigned at startup), and **12 bits of sequence number** (up to 4,096 IDs per machine per millisecond). Two different machines can never collide, since their machine-ID bits differ; the same machine can never collide with itself, since the sequence number increments within a millisecond and the timestamp advances between them. This exact scheme (or a close variant) is real and confirmed in production at Twitter (Tweet IDs), Instagram (photo IDs — publicly documented in Instagram's own 2012 engineering blog), and Discord (message/user/channel IDs) — but in every one of those cases, the ID is an **internal, numeric, roughly-time-sortable identifier**, never handed to a user as a short public code. Full bit-layout diagram and a complete, compilable Go implementation live in [[LLD/20 - Design a Distributed ID Generator/Design a Distributed ID Generator|Design a Distributed ID Generator]].
 
 > [!bug] Why a raw Snowflake ID does NOT fit into 7 base62 characters — the exact math
-> `EncodeBase62` above works on *any* `uint64`, but "7 characters" quietly assumed a small ID. It's worth doing the arithmetic explicitly, since this is a real follow-up question, not a hypothetical: 7 base62 characters can represent `62^7 ≈ 3.52 × 10¹²` distinct values — that's `log₂(62^7) ≈ 41.68 bits` of entropy. A Snowflake ID uses **63 usable bits** (64 total, minus the 1 unused sign bit) — nowhere close to fitting in 41.68 bits. Base62-encoding a full Snowflake ID actually produces **up to 11 characters** (`62^10 ≈ 8.4 × 10¹⁷` is still short of `2^64`; `62^11 ≈ 5.2 × 10¹⁹` covers it), not 7 — a real, common mistake if you reach for "Snowflake" without checking it against the length requirement already fixed in Step 2.
+> 7 base62 characters represent `62⁷ ≈ 3.52 × 10¹²` distinct values — `log₂(62⁷) ≈ 41.68 bits` of entropy. A Snowflake ID uses **63 usable bits** (64 total, minus 1 unused sign bit) — nowhere close to fitting in 41.68 bits. Base62-encoding a full Snowflake ID actually produces **up to 11 characters** (`62¹⁰ ≈ 8.4 × 10¹⁷` still falls short of `2⁶⁴`; `62¹¹ ≈ 5.2 × 10¹⁹` covers it) — a real, common mistake if "Snowflake" gets reached for without checking it against the 7-character requirement fixed back in Step 2.
 >
-> **Two honest ways to resolve this, both worth naming:**
-> 1. **Don't use the full 64-bit layout at all.** This is what the chapter's actual counter-based solution above already does — `62^7 ≈ 3.5 trillion` IDs is comfortably enough capacity for decades at this system's real write volume (`~193 writes/sec` average, from Step 2's estimation), so there was never a need for Snowflake's full 63 bits of precision in the first place. Snowflake is the right *reference point* for "local generation, no shared counter" as a concept — not something to bolt on unmodified.
-> 2. **If local generation specifically is wanted, shrink the bit layout to fit ~41 bits, not 63.** A concrete example, staying under the 41-bit safe budget:
+> **Two honest ways to resolve this, if Snowflake's zero-coordination property is specifically wanted for this system anyway:**
+> 1. **Recognize it isn't actually needed here.** `62⁷ ≈ 3.5 trillion` capacity already covers decades at this system's real `~193 writes/sec` average — there was never a genuine need for Snowflake's full 63-bit precision. Options 1-3 above already solve the *real* problem this system has.
+> 2. **Shrink the bit layout to fit a 41-bit budget instead of 63:**
 >
 > ```mermaid
 > graph LR
@@ -133,7 +162,12 @@ func DecodeBase62(code string) uint64 {
 >     end
 > ```
 >
-> The real cost of this shrinkage, stated precisely: dropping from **milliseconds to seconds** of timestamp granularity, from **1,024 to 64 machines**, and from **4,096 to 32 IDs per machine per tick** — each halving of a field is a genuine tradeoff, not free. At this system's peak write load, 32 IDs/sec on a single machine is workable but leaves little headroom if traffic concentrates on one instance — a real reason a team might instead keep milliseconds and shrink the machine-ID field further (e.g., 20-bit timestamp-in-seconds is too short; 25 bits ≈ 1 year is one real alternative split), or simply accept option 1 above and skip Snowflake entirely for a system at this scale.
+> The real cost of this shrinkage, stated precisely: dropping from **milliseconds to seconds** of timestamp granularity, from **1,024 to 64 machines**, and from **4,096 to 32 IDs per machine per tick** — each halving of a field is a genuine tradeoff, not free. At this system's peak write load, 32 IDs/sec on a single machine is workable but leaves little headroom if traffic concentrates on one instance — a real reason a team might instead accept option 1 and skip Snowflake entirely for a system at this scale.
+
+### The actual answer to "which one is best"
+
+> [!success] No single universal winner — the honest, defensible recommendation
+> **For this specific system (a URL shortener), lead with counter + range allocation** in an interview — it's the simplest to build, defend, and reason about, and it's what this chapter's own architecture (Step 5 onward) is built around. **Name random generation + Bloom filter as the real production alternative** the moment enumeration/security comes up as a follow-up — many real link shorteners prefer it for exactly that reason. **Name hash-based** if free deduplication of identical long URLs is a stated requirement. **Name Snowflake accurately** — a real, confirmed production technique, genuinely excellent for internal high-throughput ID generation across huge fleets, and *not* the standard tool for handing a user a compact 7-character code, with the exact reason (the bit-math above) ready to state if asked.
 
 **Need to protect the DB from the read-heavy redirect path → add a cache.** Redirect lookups are read-heavy, keyed by short code, and the mapping is (mostly) immutable once created — a textbook fit for **cache-aside**: on redirect, check Redis first; on a miss, read from the DB and populate the cache; on a write (new short URL created), populate the cache proactively rather than waiting for the first read to miss.
 
