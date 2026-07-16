@@ -116,7 +116,24 @@ func DecodeBase62(code string) uint64 {
 > [!info] Snowflake — the fully-local alternative, explained precisely
 > Range allocation still depends on a shared allocator *eventually* — Twitter's **Snowflake** scheme removes that dependency entirely by generating every ID **locally, with zero network calls**. Each 64-bit ID packs three fields: **41 bits of timestamp** (milliseconds since a custom epoch, ~69 years of range), **10 bits of machine ID** (up to 1,024 distinct machines, assigned at startup), and **12 bits of sequence number** (up to 4,096 IDs per machine per millisecond, incremented for IDs generated in the same millisecond). Two different machines can never collide, since their machine-ID bits differ; the same machine can never collide with itself, since the sequence number increments within a millisecond and the timestamp advances between them. No coordination, no shared counter, no round-trip per ID.
 >
-> Applied to TinyURL specifically: base62-encode the resulting Snowflake ID exactly the same way as the counter-based ID above — the encoding step doesn't change, only *where the ID number comes from* changes. Full bit-layout diagram and a complete, compilable Go implementation live in [[LLD/20 - Design a Distributed ID Generator/Design a Distributed ID Generator|Design a Distributed ID Generator]] — worth reading end to end if Snowflake comes up as its own follow-up question.
+> Full bit-layout diagram and a complete, compilable Go implementation live in [[LLD/20 - Design a Distributed ID Generator/Design a Distributed ID Generator|Design a Distributed ID Generator]] — worth reading end to end if Snowflake comes up as its own follow-up question.
+
+> [!bug] Why a raw Snowflake ID does NOT fit into 7 base62 characters — the exact math
+> `EncodeBase62` above works on *any* `uint64`, but "7 characters" quietly assumed a small ID. It's worth doing the arithmetic explicitly, since this is a real follow-up question, not a hypothetical: 7 base62 characters can represent `62^7 ≈ 3.52 × 10¹²` distinct values — that's `log₂(62^7) ≈ 41.68 bits` of entropy. A Snowflake ID uses **63 usable bits** (64 total, minus the 1 unused sign bit) — nowhere close to fitting in 41.68 bits. Base62-encoding a full Snowflake ID actually produces **up to 11 characters** (`62^10 ≈ 8.4 × 10¹⁷` is still short of `2^64`; `62^11 ≈ 5.2 × 10¹⁹` covers it), not 7 — a real, common mistake if you reach for "Snowflake" without checking it against the length requirement already fixed in Step 2.
+>
+> **Two honest ways to resolve this, both worth naming:**
+> 1. **Don't use the full 64-bit layout at all.** This is what the chapter's actual counter-based solution above already does — `62^7 ≈ 3.5 trillion` IDs is comfortably enough capacity for decades at this system's real write volume (`~193 writes/sec` average, from Step 2's estimation), so there was never a need for Snowflake's full 63 bits of precision in the first place. Snowflake is the right *reference point* for "local generation, no shared counter" as a concept — not something to bolt on unmodified.
+> 2. **If local generation specifically is wanted, shrink the bit layout to fit ~41 bits, not 63.** A concrete example, staying under the 41-bit safe budget:
+>
+> ```mermaid
+> graph LR
+>     subgraph "41-bit mini-Snowflake — fits in 7 base62 chars"
+>     A["30 bits<br/>timestamp (seconds since<br/>custom epoch, ~34 years)"] --> B["6 bits<br/>machine ID<br/>(64 machines)"]
+>     B --> C["5 bits<br/>sequence<br/>(32 IDs/machine/sec)"]
+>     end
+> ```
+>
+> The real cost of this shrinkage, stated precisely: dropping from **milliseconds to seconds** of timestamp granularity, from **1,024 to 64 machines**, and from **4,096 to 32 IDs per machine per tick** — each halving of a field is a genuine tradeoff, not free. At this system's peak write load, 32 IDs/sec on a single machine is workable but leaves little headroom if traffic concentrates on one instance — a real reason a team might instead keep milliseconds and shrink the machine-ID field further (e.g., 20-bit timestamp-in-seconds is too short; 25 bits ≈ 1 year is one real alternative split), or simply accept option 1 above and skip Snowflake entirely for a system at this scale.
 
 **Need to protect the DB from the read-heavy redirect path → add a cache.** Redirect lookups are read-heavy, keyed by short code, and the mapping is (mostly) immutable once created — a textbook fit for **cache-aside**: on redirect, check Redis first; on a miss, read from the DB and populate the cache; on a write (new short URL created), populate the cache proactively rather than waiting for the first read to miss.
 
