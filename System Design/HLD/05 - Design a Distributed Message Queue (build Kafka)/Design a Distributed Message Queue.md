@@ -7,42 +7,69 @@ status: reference-quality
 
 # Design a Distributed Message Queue (build Kafka)
 
-> [!abstract] What you'll be able to do after this chapter
-> Build the *system-design* framing around Kafka's internals (already covered in full elsewhere) — capacity planning for partition count, the metadata/discovery problem new clients face, and controller election at the cluster level.
+> [!abstract] How to read this chapter
+> Built phase by phase, but scoped to the *system-design* framing around Kafka's internals — the internals themselves live elsewhere. Each phase adds one idea, exposes the next bottleneck, and fixes it: capacity planning for partition count, the metadata/discovery problem new clients face, and controller election at the cluster level.
 
 > [!info] This chapter assumes you've read the internals chapter
-> Broker/partition/segment/ISR/leader-election/delivery-guarantees/log-compaction mechanics are covered in full in [[CS Fundamentals/05 - Messaging & Streaming/Kafka Internals|Kafka Internals]] — this chapter doesn't re-derive any of that. It answers the *system-design* question: "design a system like this from scratch," focused on what that internals chapter doesn't cover — estimation, discovery, and cluster-level coordination.
+> Broker/partition/segment/ISR/leader-election/delivery-guarantee/log-compaction mechanics are covered in full in [[CS Fundamentals/05 - Messaging & Streaming/Kafka Internals|Kafka Internals]] — this chapter doesn't re-derive any of that. It answers "design a system like this from scratch," focused on what internals doesn't cover: **estimation, discovery, and cluster-level coordination.**
 
----
-
-## Step 1 — The interview question
-
-> [!question] As an interviewer would ask it
+> [!question] The interview question
 > "Design a distributed, partitioned, replicated message queue supporting high-throughput publish-subscribe with independent consumer groups and configurable durability — essentially, build Kafka."
 
-## Step 2 — Requirements
+---
 
-**Functional:** publish to a topic, consume in order *within a partition*, multiple independent consumer groups reading the same topic, configurable retention.
+## Requirements
 
-**Non-functional:** millions of messages/sec throughput. Durability — no data loss for acknowledged writes. Horizontal scalability. Fault tolerance — a broker failure must not stop the system or lose data.
+**Functional**
+- Publish to a topic.
+- Consume **in order within a partition**.
+- Multiple **independent consumer groups** read the same topic.
+- Configurable **retention**.
 
-## Step 3 — Back-of-envelope estimation
+**Non-functional**
 
-Assume 1M messages/sec average, ~1KB average message size → **~1GB/sec** aggregate throughput — far beyond any single machine's disk/network ceiling, confirming partitioning across many brokers isn't optional. Assume 7-day retention: `1GB/sec × 7 × 86,400 sec ≈ 600TB` before replication, **~1.8PB** with a replication factor of 3 — this scale is exactly why the design must shard both storage *and* throughput across a large, horizontally-scaled cluster from day one, not as a later optimization.
-
-## Step 4 — Building it incrementally (the parts unique to this chapter)
-
-**v0 — single-server append-only log.** The simplest possible durable queue. Breaks past one machine's throughput/storage ceiling, and is a single point of failure — the exact motivation for everything [[CS Fundamentals/05 - Messaging & Streaming/Kafka Internals|the internals chapter]] describes (partitioning, replication, ISR).
-
-**The new problem this HLD framing surfaces: how does a client find the right broker?** A producer publishing to topic `orders`, partition 3, needs to know **which specific broker currently holds the leader** for that partition — and that can change at any time (broker failure, rebalancing). This is the **metadata / discovery problem**, and it's the piece worth deep-diving here specifically because the internals chapter treats it as a given rather than explaining the mechanism.
+| Requirement | Why it matters here specifically |
+|---|---|
+| **Millions of msgs/sec** | ~1 GB/s aggregate — far beyond one machine, so partitioning across brokers isn't optional. |
+| **Durability** | No data loss for acknowledged writes — the whole promise of a queue. |
+| **Horizontal scalability** | Shard both storage *and* throughput across a large cluster from day one. |
+| **Fault tolerance** | A broker failure must neither stop the system nor lose data. |
 
 ---
 
-## Step 5 — Deep dive: metadata discovery, controller election, and partition-count planning
+## Phase 00 — Capacity math you can defend
 
-### Metadata discovery — the actual mechanism
+| Quantity | Derivation | Result |
+|---|---|---|
+| Aggregate throughput | 1M msgs/s × ~1 KB | ~1 GB/s — beyond any single disk/NIC |
+| 7-day retention | 1 GB/s × 7 × 86,400 s | ~600 TB before replication |
+| With RF=3 | × 3 | **~1.8 PB** |
 
-Any broker in the cluster can answer a metadata request: "who currently leads partition P of topic T?" Clients **cache** this mapping locally rather than querying on every single publish/fetch. When a client's cached mapping goes stale (the leader moved, e.g. after a failure), its request to the old leader fails with a `NotLeaderForPartition`-style error — the client then **refreshes its metadata** and retries against the correct, current leader. This request-fail-refresh-retry loop is the actual mechanism, not magic auto-discovery — worth being able to state precisely.
+> [!example] In plain words
+> Both throughput *and* storage blow past one machine by orders of magnitude. That's why the design shards across a horizontally-scaled cluster from day one — partitioning is the premise, not a later optimization.
+
+---
+
+## Phase 01 — A single-server append-only log
+
+*The simplest possible durable queue, so the cluster features earn their place.*
+
+One append-only log on disk: producers append, consumers read by offset. Durable, ordered, dead simple. Breaks past one machine's throughput/storage ceiling, and is a single point of failure.
+
+| 🔴 Bottleneck | 🟢 Next fix |
+|---|---|
+| One machine caps throughput and storage, and its death loses everything. | Partition + replicate across brokers (the internals chapter) — then face the *new* problem: clients finding the right broker. |
+
+> [!info] Where internals takes over
+> Partitioning (split a topic into ordered logs), replication (RF copies), and ISR/leader-election are the internals chapter's domain. This chapter picks up at the question those raise: **once partitions live on many brokers and leaders move, how does a client find the current leader?**
+
+---
+
+## Phase 02 — The metadata / discovery problem
+
+*A producer for topic `orders`, partition 3 needs the broker that currently **leads** that partition — and leadership can change at any time.*
+
+Any broker can answer a metadata request: "who currently leads partition P of topic T?" Clients **cache** this mapping locally rather than querying on every publish/fetch. When a cached mapping goes stale (leader moved after a failure), the request to the old leader fails with a `NotLeaderForPartition`-style error — the client **refreshes metadata** and retries against the current leader.
 
 ```mermaid
 sequenceDiagram
@@ -59,18 +86,41 @@ sequenceDiagram
     B_new-->>P: ack
 ```
 
-### Controller election — cluster-level coordination
+> [!tip] Say this precisely
+> This request-fail-refresh-retry loop is the *actual* mechanism — not magic auto-discovery. Caching keeps metadata lookups off the hot path; the error-driven refresh recovers from broker movement.
 
-One broker is elected **controller** of the entire cluster — responsible for detecting broker failures and triggering leader election *for every affected partition* on that broker, and propagating the resulting metadata changes to the rest of the cluster. This election itself is a consensus problem — historically coordinated through ZooKeeper, in modern Kafka handled by **KRaft** (Kafka's own Raft-based controller quorum), directly the same [[Glossary/Raft (Consensus)|Raft mechanics]] already covered generally.
-
-### Partition-count planning — a real, easy-to-get-wrong tuning decision
-
-> [!bug] A genuine operational constraint worth naming
-> Partition count for a topic can be **increased later but not decreased** — under-provisioning limits both write throughput (parallelism ceiling) and consumer-side parallelism (a consumer group can never have more *active* consumers than partitions), while over-provisioning increases per-broker overhead (more open file handles, more replication traffic) for no benefit. Capacity planning here means sizing for target throughput **and** desired maximum consumer parallelism, with room to grow — since growing later is possible, but shrinking isn't.
+| 🔴 Bottleneck | 🟢 Next fix |
+|---|---|
+| When a broker dies, *someone* must detect it and trigger leader election for every partition it led — and tell everyone the new mapping. | Cluster-level coordination: the controller (Phase 3). |
 
 ---
 
-## Step 6 — Full architecture
+## Phase 03 — Controller election: cluster-level coordination
+
+*One broker is elected **controller** of the whole cluster.*
+
+The controller detects broker failures and triggers leader election *for every affected partition* on the failed broker, then propagates the resulting metadata changes to the rest of the cluster. This election is itself a consensus problem — historically via ZooKeeper, in modern Kafka via **KRaft** (Kafka's own [[Glossary/Raft (Consensus)|Raft]]-based controller quorum).
+
+| 🔴 Bottleneck | 🟢 Next fix |
+|---|---|
+| Partition count is a tuning decision that's easy to get wrong — and one you can't fully undo. | Partition-count planning (Phase 4). |
+
+---
+
+## Phase 04 — Partition-count planning
+
+*A real, easy-to-get-wrong capacity decision.*
+
+> [!bug] A genuine operational constraint
+> Partition count for a topic can be **increased later but not decreased.** Under-provisioning limits both write throughput (parallelism ceiling) and consumer parallelism (a group can never have more *active* consumers than partitions); over-provisioning increases per-broker overhead (more open file handles, more replication traffic) for no benefit. Size for **target throughput** *and* **desired maximum consumer parallelism**, with headroom — because growing later is possible, shrinking isn't.
+
+| 🔴 Bottleneck | 🟢 Next fix |
+|---|---|
+| Individual mechanisms handled — assemble the cluster picture. | Final architecture (Phase 5). |
+
+---
+
+## Phase 05 — The final combined architecture
 
 ```mermaid
 graph TD
@@ -82,23 +132,41 @@ graph TD
     C1["Consumer Group"] -->|"fetch"| B2
 ```
 
+**Four principles to close with:**
+1. Both throughput and storage exceed one machine by orders of magnitude — partitioning is the premise.
+2. Discovery is request-fail-refresh-retry over cached metadata, not auto-magic — state the exact loop.
+3. One elected controller detects failures and drives leader election; the election is Raft/KRaft consensus.
+4. Partition count grows but never shrinks — size for throughput *and* consumer parallelism with headroom.
+
 ---
 
-## Step 7 — Interviewer follow-ups, answered
+## Interviewer follow-ups, answered
 
 > [!quote]- "How does a client know which broker to publish to?"
-> [Use the metadata caching + `NotLeaderForPartition`-triggered refresh mechanism from Step 5 — this is the specific, concrete answer, not "it just knows."]
+> It bootstraps from one or more known brokers, asks for topic/partition metadata, and caches the partition-to-leader mapping. It publishes to the cached leader; if leadership changes, the broker returns a `NotLeaderForPartition`-style error, and the client refreshes metadata and retries with bounded backoff. Metadata lookups stay off the hot path while still recovering from broker movement.
 
 > [!quote]- "What happens to in-flight publishes during a leader election — do they fail?"
-> Yes, briefly — publishes targeting a partition mid-election fail (or block, depending on client configuration) until the new leader is elected and metadata propagates. This is a genuine, bounded unavailability window — a live **CP choice**: the system favors correctness (never accepting a write that could be lost or conflict with the new leader's state) over availability during that specific window, consistent with [[CS Fundamentals/06 - Distributed Systems/CAP Theorem & PACELC|CAP's]] framing.
+> Yes, briefly — publishes targeting a partition mid-election fail (or block, per client config) until the new leader is elected and metadata propagates. A genuine, bounded unavailability window — a live **CP choice**: favor correctness (never accept a write that could be lost or conflict) over availability during that window, consistent with [[CS Fundamentals/06 - Distributed Systems/CAP Theorem & PACELC|CAP]].
 
-> [!quote]- "How would you decide on partition count for a new topic?"
-> Divide target throughput by the realistic per-partition throughput ceiling (bounded by a single leader's disk/network capacity), and separately ensure the count meets the desired maximum consumer-group parallelism — then round up with headroom, since partition count can be increased later but never decreased.
+> [!quote]- "How would you decide partition count for a new topic?"
+> Divide target throughput by realistic per-partition throughput (bounded by one leader's disk/network), and separately ensure the count meets desired maximum consumer-group parallelism — then round up with headroom, since count can increase later but never decrease.
 
-## Step 8 — Production experience
+---
+
+## Production experience
 
 > [!info] What to monitor
-> Under-replicated partitions / ISR shrinkage (from [[CS Fundamentals/05 - Messaging & Streaming/Kafka Internals|Kafka Internals]], applied at the cluster level here). **Controller election frequency** — frequent re-elections are a strong signal of cluster instability (flapping brokers, network issues), not routine operation. Partition-to-broker assignment skew — an unevenly distributed partition count creates a hot broker even when the cluster's aggregate capacity looks fine on a dashboard.
+> Under-replicated partitions / ISR shrinkage (from [[CS Fundamentals/05 - Messaging & Streaming/Kafka Internals|Kafka Internals]], at cluster level here). **Controller election frequency** — frequent re-elections signal cluster instability (flapping brokers, network issues), not routine operation. Partition-to-broker assignment skew — an uneven partition count creates a hot broker even when aggregate capacity looks fine on a dashboard.
+
+---
+
+## Cheat sheet — if you remember nothing else
+
+1. ~1 GB/s and ~1.8 PB (RF=3, 7-day) both exceed one machine — partitioning across brokers is the premise.
+2. Discovery = cached partition→leader map + `NotLeaderForPartition` error → metadata refresh → retry. Not magic.
+3. One elected controller (KRaft/Raft) detects failures, drives per-partition leader election, propagates metadata.
+4. Partition count only grows — size for throughput AND max consumer parallelism, with headroom.
+5. Watch under-replicated partitions and controller-election frequency; the latter spiking means an unstable cluster.
 
 ---
 *Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[CS Fundamentals/05 - Messaging & Streaming/Kafka Internals|Kafka Internals]] · [[Glossary/Raft (Consensus)|Raft]] · [[CS Fundamentals/06 - Distributed Systems/CAP Theorem & PACELC|CAP Theorem & PACELC]]*

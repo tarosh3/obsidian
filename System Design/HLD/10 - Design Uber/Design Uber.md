@@ -7,58 +7,126 @@ status: reference-quality
 
 # Design Uber
 
-> [!abstract] What you'll be able to do after this chapter
-> Explain geohash vs quadtree with a real tradeoff, not just "both find nearby things," identify that location-update volume (not ride requests) is the true scaling bottleneck, and reuse the exact double-booking fix from the BookMyShow chapter for driver matching.
+> [!abstract] How to read this chapter
+> Built phase by phase around one framing correction — **location-update volume, not ride requests, is the true bottleneck** — plus a real geohash-vs-quadtree tradeoff and a reused double-booking fix. Each phase adds one idea, exposes the next bottleneck, and fixes it.
 
----
-
-## Step 1 — The interview question
-
-> [!question] As an interviewer would ask it
+> [!question] The interview question
 > "Design a ride-hailing service — riders request a ride, the system matches them with a nearby available driver, tracks the ride in real time, and handles payment."
 
-## Step 2 — Requirements
+---
 
-**Functional:** request a ride (pickup/dropoff), match with a nearby driver, real-time location tracking during the ride, fare calculation, driver accept/reject.
+## Requirements
 
-**Non-functional:** **low-latency matching** — users expect near-instant assignment. Accurate real-time location updates at scale. Location-aware, geographically-partitioned matching (not global). Graceful handling of localized surge demand (a concert ending, mass simultaneous requests in one small area).
+**Functional**
+- Request a ride (pickup / dropoff).
+- **Match** with a nearby available driver.
+- Real-time **location tracking** during the ride.
+- **Fare calculation**.
+- Driver **accept / reject**.
 
-## Step 3 — Back-of-envelope estimation
+**Non-functional**
 
-Assume 5M active drivers, each reporting location every 4 seconds → **~1.25M location updates/sec globally** — a continuous, massive write stream. Compare: ~1M ride requests/hour at peak → ~280/sec. **Location-update volume, not ride-matching request volume, is the true scaling bottleneck** — a critical framing point, since it's easy to over-focus estimation on the "obvious" ride-request path instead.
-
-## Step 4 — Building it incrementally
-
-**v0 — naive.** Store every driver's lat/long in a table; find nearby drivers by scanning **all** drivers and computing distance to each. Breaks immediately — comparing a rider's location against millions of drivers on every single request is a full table scan, catastrophically slow, and gets worse linearly with driver count.
-
-**Fix — geospatial indexing.** A **geohash** or **quadtree** structure indexes driver locations so "find drivers near this point" becomes a fast, localized lookup instead of a full scan. **Geohash**: encode lat/long into a string where longer shared prefixes mean closer proximity — drivers grouped/queried by geohash prefix. A location update becomes a write to the driver's current geohash bucket; a ride request becomes a lookup of the request's geohash prefix **plus adjacent buckets**.
-
-> [!bug] The boundary problem — a real, named edge case
-> A driver just across a geohash cell boundary can be physically **closer** than one technically "inside" the same cell as the rider. Querying only the exact matching cell misses this — neighboring cells must always be checked too, not just an exact match.
+| Requirement | Why it matters here specifically |
+|---|---|
+| **Low-latency matching** | Users expect near-instant assignment — matching is the core UX. |
+| **Accurate real-time location at scale** | Millions of drivers pinging continuously — the real write firehose. |
+| **Geographically-partitioned matching** | Matching is local, never global — partition by region for locality. |
+| **Graceful localized surge** | A concert ending = mass simultaneous requests in one small area (hot partition). |
 
 ---
 
-## Step 5 — Deep dive: geohash vs quadtree, and matching as two-stage filtering
+## Phase 00 — Capacity math you can defend
+
+| Quantity | Derivation | Result |
+|---|---|---|
+| Location updates | 5M drivers × ping every 4s | **~1.25M updates/s globally** |
+| Ride requests | ~1M/hour at peak | ~280/s |
+
+> [!example] In plain words
+> Location-update volume, **not** ride-matching volume, is the true scaling bottleneck — the write stream is ~4,000× the request stream. A critical framing point: it's easy to over-focus estimation on the "obvious" ride-request path and miss where the load actually is.
+
+---
+
+## Phase 01 — The naive version: scan every driver
+
+*Start with the full-scan version so its cost names the fix.*
+
+Store every driver's lat/long in a table; find nearby drivers by scanning **all** drivers and computing distance to each. Breaks immediately — comparing a rider's location against millions of drivers on every request is a full table scan, catastrophically slow, and gets linearly worse with driver count.
+
+| 🔴 Bottleneck | 🟢 Next fix |
+|---|---|
+| "Find nearby" as a full scan is `O(all drivers)` per request — it collapses under real fleet size. | A geospatial index that makes "near this point" a localized lookup (Phase 2). |
+
+> [!example] Layman
+> Finding the closest taxi by phoning every taxi in the country and asking where it is. Instead, keep a map divided into neighborhoods and only ask the ones nearby.
+
+---
+
+## Phase 02 — Geospatial indexing
+
+*Make "find drivers near this point" a fast, localized lookup instead of a full scan.*
+
+A **geohash** or **quadtree** indexes driver locations. **Geohash**: encode lat/long into a string where longer shared prefixes mean closer proximity — drivers grouped/queried by geohash prefix. A location update writes to the driver's current geohash bucket; a ride request looks up the request's geohash prefix **plus adjacent buckets**.
+
+```mermaid
+flowchart LR
+    P["Rider location"] --> G["Geohash prefix"]
+    G --> Q["Query own cell + neighbors"]
+    Q --> C["Candidate drivers"]
+```
+
+> [!bug] The boundary problem — a real, named edge case
+> A driver just across a geohash cell boundary can be physically **closer** than one technically "inside" the same cell as the rider. Querying only the exact matching cell misses this — **neighboring cells must always be checked too**, not just an exact match.
+
+| 🔴 Bottleneck | 🟢 Next fix |
+|---|---|
+| Uniform geohash cells don't adapt to density (packed Manhattan vs empty highway); and straight-line proximity isn't real travel distance. | Geohash vs quadtree + two-stage matching (Phase 3). |
+
+---
+
+## Phase 03 — Deep dive: geohash vs quadtree, and two-stage matching
 
 > [!info] General theory, if this moves too fast
-> [[CS Fundamentals/06 - Distributed Systems/Geospatial Indexing|Geospatial Indexing]] covers geohash, quadtree, and S2/H3 as general data structures, independent of this specific ride-hailing use case — read it for the underlying algorithm and complexity, come back here for the applied numbers.
+> [[CS Fundamentals/06 - Distributed Systems/Geospatial Indexing|Geospatial Indexing]] covers geohash, quadtree, and S2/H3 as general structures independent of ride-hailing — read it for the algorithm and complexity, come back here for applied numbers.
 
-### Geohash vs quadtree — a genuine tradeoff, not two names for the same thing
+**Geohash vs quadtree — a genuine tradeoff.** **Geohash** produces a **uniform grid** — every cell the same size regardless of driver density. **Quadtree** recursively subdivides space, with **more subdivision in dense areas** — a genuine advantage for wildly uneven density: it adapts resolution to where the data actually is, while geohash cells stay fixed-size everywhere whether packed or empty.
 
-**Geohash** produces a **uniform grid** — every cell is the same size regardless of actual driver density. **Quadtree** recursively subdivides space, with **more subdivision in dense areas** — a genuine advantage for wildly uneven density (Manhattan vs a rural highway): a quadtree naturally adapts its resolution to where the data actually is, while geohash cells stay a fixed size everywhere whether that area is packed or empty.
+**Matching is two-stage, not one lookup.** The index returns **candidates** by straight-line ("as the crow flies") proximity — a **first-pass filter**, not final ranking. Real road networks aren't straight lines — a river or highway makes a straight-line-close driver genuinely far by road distance/ETA. Final ranking layers in real routing/ETA, driver rating, and vehicle-type match on top of the geospatial candidate set.
 
-### Matching is two-stage, not one lookup
+| 🔴 Bottleneck | 🟢 Next fix |
+|---|---|
+| The 1.25M/s location stream still has to be ingested somewhere fast — and not all of it needs the same durability. | Location ingestion at scale + tiered durability (Phase 4). |
 
-Geospatial index lookup returns **candidates** by straight-line ("as the crow flies") proximity — this is a **first-pass filter**, not the final ranking. Real road networks aren't straight lines — a river or highway can make a straight-line-close driver genuinely far by actual road distance/ETA. Final ranking layers in real routing/ETA data, driver rating, and vehicle-type match on top of the geospatial candidate set.
+---
 
-### Location-update ingestion at 1.25M/sec
+## Phase 04 — Location ingestion at 1.25M/sec
 
-This is fundamentally a high-throughput **write** problem, structurally similar to the messaging infrastructure already covered elsewhere in this handbook: updates publish to [[CS Fundamentals/05 - Messaging & Streaming/Kafka Internals|Kafka]] (partitioned by geographic region for locality), consumed by a service updating the geospatial index — backed by [[CS Fundamentals/04 - Caching/Redis Internals|Redis]] for its speed, matching exactly the kind of frequently-updated, latency-sensitive data Redis is built for.
+*Fundamentally a high-throughput **write** problem — reuse the messaging shape.*
 
-> [!tip] Not every piece of data in this system needs the same durability guarantee
-> GPS location pings are **ephemeral** — losing one update is fine, since the next one arrives in 4 seconds and supersedes it. Writing every ping synchronously to a durable database would be wasted cost for no real benefit. A ride's **financial transaction data**, in the same system, absolutely does need full durability. Recognizing that different data *within one system* can legitimately have different consistency/durability bars — rather than applying one uniform standard everywhere — is a genuine senior-level distinction.
+Updates publish to [[CS Fundamentals/05 - Messaging & Streaming/Kafka Internals|Kafka]] (partitioned by geographic region for locality), consumed by a service updating the geospatial index — backed by [[CS Fundamentals/04 - Caching/Redis Internals|Redis]] for speed, matching exactly the frequently-updated, latency-sensitive data Redis is built for.
 
-## Step 6 — Full architecture
+> [!tip] Not every piece of data needs the same durability guarantee
+> GPS pings are **ephemeral** — losing one is fine, the next arrives in 4 seconds and supersedes it. Writing every ping synchronously to a durable DB would be wasted cost. A ride's **financial transaction data**, in the same system, absolutely does need full durability. Recognizing that different data *within one system* can have different consistency/durability bars — rather than one uniform standard — is a genuine senior-level distinction.
+
+| 🔴 Bottleneck | 🟢 Next fix |
+|---|---|
+| A matched driver must not be matched to a second rider simultaneously — a race on the "available" flag. | Atomic check-and-claim (Phase 5). |
+
+---
+
+## Phase 05 — Correctness: no double-matched drivers
+
+*Structurally the identical correctness problem as seat double-booking.*
+
+A naive check-then-act on a driver's "available" flag is a race condition. The fix is the exact pattern reused from [[LLD/06 - Design BookMyShow - Seat Booking/Design BookMyShow - Seat Booking|BookMyShow's seat double-booking]]: make the **check-and-claim one atomic operation** on driver availability status, so two concurrent match attempts can't both win.
+
+| 🔴 Bottleneck | 🟢 Next fix |
+|---|---|
+| Individual pieces handled — and a concert-ending surge stresses one local shard. | Final architecture + surge handling (Phase 6). |
+
+---
+
+## Phase 06 — The final combined architecture
 
 ```mermaid
 graph TD
@@ -70,29 +138,50 @@ graph TD
     Lookup --> GeoStore
     GeoStore --> Candidates["Candidate drivers<br/>(straight-line proximity)"]
     Candidates --> Ranking["Rank by real ETA,<br/>rating, vehicle type"]
-    Ranking --> Match["Matched driver"]
+    Ranking --> Match["Atomic check-and-claim → matched driver"]
 ```
+
+**Surge** (a concert ending) stresses the local geospatial shard serving that area — the same hot-partition problem as caches and shard keys elsewhere. Mitigation is the same pattern: the index can dynamically re-shard or add capacity for dense regions rather than assuming uniform load.
+
+**Five principles to close with:**
+1. Location-update volume, not ride requests, is the true bottleneck — size estimation for the write firehose.
+2. Geospatial index turns "find nearby" from a full scan into a localized lookup — always query neighbor cells too.
+3. Geohash (uniform grid) vs quadtree (density-adaptive) is a real tradeoff, not two names for one thing.
+4. Matching is two-stage: straight-line candidates first, real ETA/rating/vehicle ranking second.
+5. Tier durability within one system — ephemeral pings need none, financial data needs full; double-match is fixed by atomic check-and-claim.
 
 ---
 
-## Step 7 — Interviewer follow-ups, answered
+## Interviewer follow-ups, answered
 
-> [!quote]- "How do you handle the boundary problem where a nearby driver is in an adjacent geohash cell?"
-> Query neighboring cells alongside the exact-match cell for every request — covered in Step 4.
+> [!quote]- "Boundary problem — nearby driver in an adjacent geohash cell?"
+> Query neighboring cells alongside the exact-match cell for every request.
 
-> [!quote]- "How would you handle a massive demand surge in one small area, like a concert ending?"
-> This genuinely stresses the local geospatial shard serving that area — the same hot-partition problem already covered for caches and shard keys elsewhere in this handbook. Mitigation follows the same pattern: ensure the geospatial index can dynamically re-shard or add capacity for dense regions rather than assuming uniform load across all shards.
+> [!quote]- "Massive demand surge in one small area (concert ending)?"
+> It stresses the local geospatial shard for that area — the same hot-partition problem as caches/shard keys. Mitigate the same way: the index dynamically re-shards or adds capacity for dense regions rather than assuming uniform load.
 
-> [!quote]- "Why not just use straight-line distance as the final ranking?"
-> Road networks aren't straight lines — a river, highway, or one-way street system can make straight-line-close drivers genuinely far by actual travel time. Straight-line distance is only the cheap first-pass candidate filter.
+> [!quote]- "Why not just use straight-line distance as final ranking?"
+> Road networks aren't straight lines — a river, highway, or one-way system makes straight-line-close drivers genuinely far by travel time. Straight-line is only the cheap first-pass candidate filter.
 
-> [!quote]- "How do you ensure a driver isn't matched to two riders simultaneously?"
-> Structurally the identical correctness problem as [[LLD/06 - Design BookMyShow - Seat Booking/Design BookMyShow - Seat Booking|BookMyShow's seat double-booking]] — an atomic check-and-claim on driver availability status, the exact same fix pattern reused: a naive check-then-act on a driver's "available" flag is a race condition, fixed by making the check-and-claim one atomic operation.
+> [!quote]- "Ensure a driver isn't matched to two riders simultaneously?"
+> The identical correctness problem as [[LLD/06 - Design BookMyShow - Seat Booking/Design BookMyShow - Seat Booking|BookMyShow's seat double-booking]] — an atomic check-and-claim on driver availability; a naive check-then-act is a race, fixed by making check-and-claim one atomic operation.
 
-## Step 8 — Production experience
+---
+
+## Production experience
 
 > [!info] What to monitor
-> Geospatial index update lag — are location updates reflected in match-eligible data in near-real-time, or is there a growing processing delay? **Match latency** (rider-request to driver-assigned time) — the core UX metric. Matching success rate **by region** (surfaces localized supply/demand imbalance). Kafka consumer lag on the location-ingestion pipeline.
+> Geospatial index update lag — are location updates reflected in match-eligible data in near-real-time? **Match latency** (rider-request to driver-assigned) — the core UX metric. Matching success rate **by region** (surfaces localized supply/demand imbalance). Kafka consumer lag on the location-ingestion pipeline.
+
+---
+
+## Cheat sheet — if you remember nothing else
+
+1. Location updates (~1.25M/s) not ride requests (~280/s) are the bottleneck — estimate for the write firehose.
+2. Geospatial index (geohash/quadtree) makes "find nearby" a localized lookup — always query neighbor cells (boundary problem).
+3. Geohash = uniform grid; quadtree = density-adaptive subdivision — a genuine tradeoff.
+4. Matching is two-stage: straight-line candidates, then real ETA/rating/vehicle-type ranking.
+5. Tier durability (ephemeral pings vs durable payments); fix double-matching with an atomic check-and-claim; re-shard dense surge regions.
 
 ---
 *Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[LLD/06 - Design BookMyShow - Seat Booking/Design BookMyShow - Seat Booking|Design BookMyShow / Seat Booking]] · [[CS Fundamentals/04 - Caching/Redis Internals|Redis Internals]]*

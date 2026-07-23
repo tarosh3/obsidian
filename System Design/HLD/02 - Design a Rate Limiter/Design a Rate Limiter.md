@@ -7,52 +7,114 @@ status: reference-quality
 
 # Design a Rate Limiter
 
-> [!abstract] What you'll be able to do after this chapter
-> Explain why a rate limiter is fundamentally a *distributed state* problem, not just an algorithm problem, compare all four major algorithms with their real failure modes, and name the exact atomicity bug most candidates miss when implementing this against Redis.
+> [!abstract] How to read this chapter
+> Built phase by phase the way you'd narrate it on a whiteboard. The one idea that reframes everything: a rate limiter is fundamentally a **distributed state** problem, not an algorithm problem. Each phase adds one piece, exposes the next bottleneck, and fixes it — ending on the exact atomicity bug most candidates miss.
+
+> [!question] The interview question
+> "Design a rate limiter that throttles requests per user, per IP, or per API key, applied consistently across a fleet of many application servers."
 
 ---
 
-## Step 1 — The interview question
+## Requirements
 
-> [!question] As an interviewer would ask it
-> "Design a rate limiter that throttles requests per user, per IP, or per API key, applied consistently across a fleet of many application servers."
+**Functional**
+- Limit requests to `N` per time window per client identifier (user / IP / API key).
+- Support different limits per client **tier** (free vs paid) and per **endpoint**.
+- Return `429 Too Many Requests` with a `Retry-After` header when limited.
 
-## Step 2 — Requirements
+**Non-functional — and the one that actually defines this problem**
 
-**Functional:** limit requests to `N` per time window per client identifier. Support different limits per client tier (free vs paid). Return `429 Too Many Requests` with a `Retry-After` header when limited.
+| Requirement | Why it matters here specifically |
+|---|---|
+| **Correct across many servers** | This is what separates the HLD version from the [[LLD/04 - Design a Rate Limiter/Design a Rate Limiter\|LLD one]]: a naive per-server counter is trivially defeated the moment a client's requests load-balance across instances. |
+| **Negligible added latency** | It sits on the hot path of *every single request* — sub-millisecond, or it's a tax on the whole system. |
+| **Accuracy vs performance is explicit** | Not a solved problem — a real tradeoff between exact and approximate limiting, stated deliberately. |
+| **Must not become a SPOF** | A limiter that takes the whole service down when *it* fails is worse than the abuse it prevents (fail-open, Phase 06). |
 
-**Non-functional — and the one that actually defines this problem:**
-- **Must work correctly across multiple servers**, not just one machine — this is what separates the HLD version of this question from its [[LLD/04 - Design a Rate Limiter/Design a Rate Limiter|LLD counterpart]]: a naive per-server counter is trivially defeated the moment a client's requests get load-balanced across different backend instances.
-- **Must add negligible latency** — it sits on the hot path of *every single request* in the system.
-- **Accuracy vs performance is a real, explicit tradeoff**, not a solved problem — covered in depth below.
+---
 
-## Step 3 — Back-of-envelope estimation
+## Phase 00 — Capacity math you can defend
 
-Assume 1M active users, with a realistic peak of ~100,000–500,000 rate-limit checks/sec across the fleet (not every user hitting simultaneously, but planning for real peak load). Each check must complete in **sub-millisecond** time, since it's added latency on top of every request. Storage: a small counter (or short structure) per client identifier — even at 1M distinct clients, this is tens of MB, trivial for an in-memory store — but that state must be **shared** across every app server, which is the actual crux of the design.
+| Quantity | Derivation | Result |
+|---|---|---|
+| Checks/sec (peak) | 1M active users, realistic peak | ~100k–500k checks/s across the fleet |
+| Per-check budget | on top of every request | **sub-millisecond** |
+| State size | one small counter/struct per client | tens of MB at 1M clients — trivial |
+| The real constraint | that state must be **shared** across every app server | the actual crux of the design |
 
-## Step 4 — Building it incrementally
+> [!example] In plain words
+> The data is tiny and the ops are cheap. The entire difficulty is that the count must be **one shared truth** seen identically by every server, updated on the hot path, without races. That sentence is the whole design.
 
-**v0 — the naive version.** A counter in each app server's local memory. This **breaks the instant there's more than one server**: a client's requests get load-balanced across instances, and each instance has its own independent, wrong view of "how many requests has this client made recently." This isn't a scaling nuance — it's the entire problem this chapter exists to solve.
+---
 
-**Fix: shared, fast, centralized counter state.** [[CS Fundamentals/04 - Caching/Redis Internals|Redis]] is the natural fit — in-memory (sub-millisecond ops), supports atomic increments natively, and is purpose-built for exactly this kind of hot-path shared counter.
+## Phase 01 — The naive local counter (and why it's dead on arrival)
 
-### The algorithm choice — four real options, four real tradeoffs
+*Start with what everyone writes first, so its failure names the real problem.*
+
+```mermaid
+flowchart TD
+    C["Client"] --> LB["Load balancer"]
+    LB --> A1["App server 1<br/>local counter = 3"]
+    LB --> A2["App server 2<br/>local counter = 3"]
+    LB --> A3["App server 3<br/>local counter = 3"]
+```
+
+A counter in each app server's local memory. **Breaks the instant there's more than one server:** a client's requests load-balance across instances, and each instance has its own independent, *wrong* view of "how many requests has this client made recently." A client with a limit of `N` can send `N` to *each* of 3 servers and get `3N` through.
+
+| 🔴 Bottleneck | 🟢 Next fix |
+|---|---|
+| Local counters give each server a partial, wrong count — the limit is silently `N × server_count`. This isn't a scaling nuance, it's the whole problem. | Move the counter into shared, fast, centralized state (Phase 2). |
+
+> [!example] Layman
+> Three bouncers at three doors, each with their own clipboard, none talking. A guest turned away at one door walks to the next. The club needs *one* guest list all three read from.
+
+---
+
+## Phase 02 — Shared centralized counter state (Redis)
+
+*The count must live in one place every server can read and write atomically.*
+
+```mermaid
+flowchart TD
+    A1["App server 1"] -->|INCR client_id| R[("Redis<br/>counters per client")]
+    A2["App server 2"] -->|INCR client_id| R
+    A3["App server 3"] -->|INCR client_id| R
+```
+
+[[CS Fundamentals/04 - Caching/Redis Internals|Redis]] is the natural fit — in-memory (sub-millisecond ops), atomic increments native, purpose-built for exactly this hot-path shared counter.
+
+| 🔴 Bottleneck | 🟢 Next fix |
+|---|---|
+| "Just `INCR` a counter" leaves the *algorithm* unspecified — and the naive fixed-window version has a real burst bug. | Choose the counting algorithm deliberately (Phase 3). |
+
+---
+
+## Phase 03 — The algorithm choice: four real options, four real tradeoffs
+
+*Each is a different point on the accuracy-vs-cost curve. Know all four; recommend one.*
 
 | Algorithm | Mechanism | Strength | Real flaw |
 |---|---|---|---|
-| **Fixed window counter** | `INCR` a key like `rate:{client}:{window_start}` with a TTL; reject if over limit. | `O(1)`, dead simple. | **Boundary burst**: a client can send `N` requests at `11:59:59` and another `N` at `12:00:00` — `2N` requests in roughly one real second, despite the "limit" being `N` per minute. |
-| **Sliding window log** | Store every request timestamp in a Redis sorted set (`ZADD`); trim entries outside the window (`ZREMRANGEBYSCORE`); count what remains (`ZCARD`). | Fully accurate — no boundary burst. | `O(log n)` per operation, and real memory cost — storing every individual timestamp, not just a count. |
-| **Sliding window counter (approximation)** | Weight the previous fixed window's count proportionally: `count = current_window_count + previous_window_count × (fraction of current window remaining)`. | Much cheaper than the log approach — just two counters — and a good approximation of the true sliding window. | Still an approximation, not exact — acceptable for the vast majority of real rate-limiting use cases. |
-| **Token bucket** | Tokens refill at a fixed rate up to a cap; each request consumes one. | Naturally allows **bursts** up to the bucket size while still enforcing the long-run average rate — the algorithm real APIs (Stripe, GitHub) actually expose to users as documented behavior. | Needs care to implement *atomically* against shared state — see Step 5. |
+| **Fixed window counter** | `INCR rate:{client}:{window_start}` with TTL; reject if over limit | `O(1)`, dead simple | **Boundary burst**: `N` requests at `11:59:59` + `N` at `12:00:00` = `2N` in ~1 real second |
+| **Sliding window log** | Store every request timestamp in a sorted set (`ZADD`); trim (`ZREMRANGEBYSCORE`); count (`ZCARD`) | Fully accurate — no boundary burst | `O(log n)` per op, real memory cost — every timestamp, not a count |
+| **Sliding window counter** *(approx)* | Weight the previous window: `count = current + prev × (fraction of current window remaining)` | Much cheaper — two counters — good approximation | Still approximate; fine for the vast majority of real uses |
+| **Token bucket** | Tokens refill at a fixed rate up to a cap; each request consumes one | Naturally allows **bursts** up to bucket size while enforcing long-run average — what Stripe/GitHub expose | Needs care to implement *atomically* (Phase 4) |
+
+> [!tip] Recommendation
+> **Token bucket** for public APIs — bursts are a feature users expect, and the long-run rate stays capped. **Sliding window counter** when you want tighter fairness without storing every timestamp. Fixed window only when the boundary burst genuinely doesn't matter.
+
+| 🔴 Bottleneck | 🟢 Next fix |
+|---|---|
+| Token bucket needs "read tokens → check → decrement." Done as three round-trips, that's a race condition under real concurrency. | Make check-and-decrement one atomic operation (Phase 4). |
 
 ---
 
-## Step 5 — Deep dive: the atomicity bug most candidates miss
+## Phase 04 — Deep dive: the atomicity bug most candidates miss
 
-> [!bug] "Read tokens, check, decrement" as three separate Redis calls is a real race condition
-> If a rate limiter reads the current token count, checks it against the limit, and decrements it as **three separate round-trips** to Redis, two concurrent requests from *different app servers* hitting the *same client's* key can both read the same "tokens remaining" value before either one's decrement lands — both get approved, and the limit is silently violated under real concurrent load.
+> [!bug] "Read tokens, check, decrement" as three separate Redis calls is a real race
+> If the limiter reads the token count, checks it, and decrements as **three round-trips**, two concurrent requests from *different app servers* hitting the *same client's* key can both read the same "tokens remaining" before either decrement lands — both get approved, limit silently violated under real load.
 
-The fix: perform the entire check-and-decrement as **one atomic Redis Lua script**. This works precisely because of [[CS Fundamentals/04 - Caching/Redis Internals|Redis's single-threaded command execution]] — a Lua script runs to completion as one indivisible unit, with no other client's command able to interleave partway through it. This is the exact payoff of that architectural fact from the Redis Internals chapter, applied directly: it's *why* this atomicity guarantee is even possible without a separate distributed lock.
+The fix: do the entire check-and-decrement as **one atomic Redis Lua script**. This works precisely because of [[CS Fundamentals/04 - Caching/Redis Internals|Redis's single-threaded command execution]] — a Lua script runs to completion as one indivisible unit, no other client's command interleaving. That's *why* the atomicity guarantee exists without a separate distributed lock.
 
 ```lua
 -- Simplified token bucket check-and-consume, run atomically in Redis
@@ -77,13 +139,53 @@ else
 end
 ```
 
-### Where does the limiter actually sit?
+> [!example] Layman
+> One shared guest list, but two bouncers reading it at the same millisecond both see "1 spot left" and both admit a guest. The Lua script is a rule that only one bouncer may touch the list at a time, and must finish reading *and* crossing off before the other looks.
 
-**At the API Gateway / edge:** rejects traffic before it ever reaches an app server — saves backend resources, but limits are necessarily coarser (harder to express rich per-endpoint logic at the edge). **Embedded per app server, calling out to Redis:** more flexible (different limits per endpoint, per user tier, computed with full application context), at the cost of a network round-trip to Redis added to every request.
+| 🔴 Bottleneck | 🟢 Next fix |
+|---|---|
+| Correct now — but *where* the check runs (edge vs app server) changes flexibility and latency. | Decide placement (Phase 5). |
 
 ---
 
-## Step 6 — Full architecture
+## Phase 05 — Where the limiter actually sits
+
+*A placement tradeoff, not a right answer — state both.*
+
+| Placement | Wins | Costs |
+|---|---|---|
+| **API Gateway / edge** | Rejects traffic before it reaches an app server — saves backend resources | Limits are coarser — hard to express rich per-endpoint/per-context logic at the edge |
+| **Embedded per app server → Redis** | Flexible — per-endpoint, per-tier limits computed with full app context | A network round-trip to Redis added to every request |
+
+> [!tip] Common real answer
+> Both, layered: coarse abuse limits at the edge (cheap, protects the fleet), fine-grained per-endpoint/per-tier limits at the app server (rich, contextual). Defense in depth.
+
+| 🔴 Bottleneck | 🟢 Next fix |
+|---|---|
+| Correct and placed — but what happens when Redis itself dies, or traffic 10×'s, or one IP hides many users? | Failure modes and scaling (Phase 6). |
+
+---
+
+## Phase 06 — Failure modes, scaling, per-endpoint limits
+
+**Redis down — a deliberate fail-open vs fail-closed choice.**
+
+> [!warning] Fail open vs fail closed
+> **Fail open** (allow all traffic while the limiter is unreachable): risks abuse during the outage but preserves service availability. **Fail closed** (block everything): safe from abuse but turns a Redis blip into a full outage. Most systems **fail open** for a rate limiter specifically — its job is to protect against abuse, and it must not itself become the SPOF that denies *legitimate* traffic.
+
+**Shared-IP fairness.** Pure-IP limiting punishes every user behind a corporate/mobile NAT for one bad actor. Combine IP with stronger signals (authenticated user ID, API key, session) where available; reserve pure-IP for genuinely anonymous traffic as an accepted, explicit tradeoff.
+
+**Per-endpoint limits.** Key the Redis state by `{client_id}:{endpoint}` rather than just `{client_id}` — each endpoint gets its own bucket, with per-endpoint rate/capacity config looked up (and cached) before invoking the Lua script.
+
+**Scaling 10×.** Shard the Redis layer — hash client ID across instances, or use [[CS Fundamentals/04 - Caching/Redis Internals|Redis Cluster's hash-slot sharding]] — so no single Redis node is the bottleneck for the whole fleet's checks.
+
+| 🔴 Bottleneck | 🟢 Next fix |
+|---|---|
+| Individual concerns handled — assemble them into one picture. | Final architecture (Phase 7). |
+
+---
+
+## Phase 07 — The final combined architecture
 
 ```mermaid
 graph TD
@@ -91,7 +193,7 @@ graph TD
     LB --> GW["API Gateway<br/>(coarse, edge-level limits)"]
     GW --> App1["App Server 1"]
     GW --> App2["App Server 2"]
-    App1 -->|"atomic Lua script"| Redis[("Redis<br/>token buckets per client")]
+    App1 -->|"atomic Lua script"| Redis[("Redis Cluster<br/>token buckets per client:endpoint")]
     App2 -->|"atomic Lua script"| Redis
 ```
 
@@ -102,7 +204,7 @@ sequenceDiagram
     participant R as Redis
 
     C->>A: request
-    A->>R: EVALSHA rate_limit_script(client_id)
+    A->>R: EVALSHA rate_limit_script(client_id:endpoint)
     Note over R: atomic — refill + check + decrement,<br/>no interleaving possible
     alt tokens available
         R-->>A: allowed
@@ -113,31 +215,48 @@ sequenceDiagram
     end
 ```
 
+**Five principles to close with:**
+1. Rate limiting is distributed *state*, not an algorithm — the count must be one shared truth.
+2. Local counters are silently `N × server_count` — never ship them past a demo.
+3. Check-and-decrement must be atomic; a Lua script leverages Redis's single-threaded execution instead of a lock.
+4. Pick the algorithm on the accuracy-vs-cost curve; token bucket for public APIs because bursts are expected.
+5. Fail **open** — a limiter must never become the SPOF that blocks legitimate traffic.
+
 ---
 
-## Step 7 — Interviewer follow-ups, answered
+## Interviewer follow-ups, answered
 
-> [!quote]- "How do you rate limit by IP when many legitimate users share one IP (corporate NAT, mobile carrier NAT)?"
-> Naive pure-IP limiting punishes every user behind that shared IP for one bad actor's traffic. Combine IP with additional signals where available (authenticated user ID, API key, session token) and reserve pure-IP limiting for genuinely anonymous/unauthenticated traffic, where it's an accepted, explicit tradeoff rather than an oversight.
+> [!quote]- "Rate limit by IP when many users share one IP (NAT)?"
+> Pure-IP limiting punishes everyone behind the shared IP for one bad actor. Combine IP with authenticated user ID / API key / session where available; reserve pure-IP for genuinely anonymous traffic as an accepted, explicit tradeoff.
 
 > [!quote]- "What happens if Redis goes down?"
-> This is a real **fail-open vs fail-closed** decision, and it should be a stated, deliberate choice. **Fail open** (allow all traffic through while the limiter is unreachable) risks abuse during the outage but preserves overall service availability. **Fail closed** (block everything) is safe from abuse but turns a Redis outage into a full service outage. Most systems **fail open** for a rate limiter specifically — the limiter's job is to protect against abuse, and it shouldn't itself become a single point of failure that denies *legitimate* traffic.
+> A deliberate **fail-open vs fail-closed** choice. Most systems fail open for a rate limiter — its job is to protect against abuse, and it shouldn't become a SPOF denying legitimate traffic. Alert on Redis unavailability so fail-open triggers knowingly, not silently.
 
-> [!quote]- "How would you support different limits for different API endpoints simultaneously?"
-> Key the Redis state by `{client_id}:{endpoint}` rather than just `{client_id}` — each endpoint gets its own independent bucket/window, with per-endpoint rate/capacity configuration looked up (and cached) by the app server before invoking the Lua script.
+> [!quote]- "Different limits for different endpoints simultaneously?"
+> Key state by `{client_id}:{endpoint}` — each endpoint gets an independent bucket, with per-endpoint rate/capacity config looked up and cached before the Lua script runs.
 
-> [!quote]- "How would you scale the rate limiter itself to 10x traffic?"
-> Shard the Redis layer — either by hashing client ID across multiple Redis instances directly, or via [[CS Fundamentals/04 - Caching/Redis Internals|Redis Cluster's hash-slot sharding]], so no single Redis node is the bottleneck for the entire fleet's rate-limit checks.
+> [!quote]- "Scale the limiter itself 10×?"
+> Shard the Redis layer — hash client ID across instances or use Redis Cluster hash-slot sharding — so no single node is the bottleneck for the fleet's checks.
 
 ---
 
-## Step 8 — Production experience
+## Production experience
 
 > [!info] What to monitor
-> Rejection rate (`429`s) per client and per endpoint — a sudden spike often signals either an abuse attempt or a misconfigured limit. Redis latency added to the request path specifically (p99, not just average). Alerting on Redis unavailability, since that should trigger the fail-open path deliberately, not silently.
+> Rejection rate (`429`s) per client and per endpoint — a sudden spike signals abuse or a misconfigured limit. Redis latency added to the request path specifically (p99, not just average). Alert on Redis unavailability so the fail-open path triggers deliberately.
 
 > [!bug] A subtle production gotcha
-> If window-boundary calculations are computed using **each app server's own local clock** rather than a centralized source, clock skew between servers can cause inconsistent fixed-window boundaries for the same client depending on which server handled the request. Keeping all time-sensitive logic inside the Lua script (using Redis's own `TIME` command, or passing a consistently-sourced timestamp) avoids this entirely.
+> If window-boundary calculations use each app server's **local clock** rather than a centralized source, clock skew causes inconsistent fixed-window boundaries for the same client depending on which server handled the request. Keep all time-sensitive logic inside the Lua script (use Redis's `TIME`, or pass a consistently-sourced timestamp) to avoid it entirely.
+
+---
+
+## Cheat sheet — if you remember nothing else
+
+1. A rate limiter is distributed *state*: the count is one shared truth every server reads, not a per-server counter.
+2. Four algorithms — fixed window (boundary burst), sliding log (exact, costly), sliding counter (cheap approx), token bucket (bursts + average). Recommend token bucket for public APIs.
+3. Check-and-decrement must be **atomic** — a single Redis Lua script, riding Redis's single-threaded execution, no separate lock.
+4. Place coarse limits at the edge, fine-grained per-endpoint/per-tier limits at the app server; key by `{client}:{endpoint}`.
+5. Fail **open** on Redis outage; shard Redis to scale; combine IP with stronger signals for NAT fairness.
 
 ---
 *Related: [[00 - Start Here/How This Handbook Works|Book Map]] · [[CS Fundamentals/04 - Caching/Redis Internals|Redis Internals]] · [[LLD/04 - Design a Rate Limiter/Design a Rate Limiter|LLD version — Design a Rate Limiter]]*
