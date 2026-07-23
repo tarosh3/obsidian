@@ -16,6 +16,9 @@ status: living-document
 > [!tip] Don't know where to start in CS Fundamentals?
 > [[CS Fundamentals/00 - Learning Path|CS Fundamentals Learning Path]] — a dependency-ordered curriculum (Computer Architecture → OS → Networking → Databases → Caching → Messaging → Distributed Systems → Architecture Patterns → Security → Operational Excellence → Design Principles), not just a folder listing. Read this before diving into individual chapters.
 
+> [!success] New to HLD?
+> Start with [[HLD/00 - HLD Interview Playbook/HLD Interview Playbook|HLD Interview Playbook]]. It explains the interview flow, estimation, API/data modeling, storage choices, scaling patterns, consistency, resilience, security, observability, and a study order for all 25 HLD case studies. Then use the case-study notes as worked examples.
+
 ---
 
 ## The three pillars
@@ -77,7 +80,7 @@ Interview question → requirement clarification → **bad first draft** (the na
 
 Chapters are written **one at a time, on request** — say *"write [chapter name]"* and it's produced to the full standard above. The three below are already written as the reference standard for everything that follows.
 
-### ✅ Written (reference-quality, read these to calibrate the bar) — 104 chapters so far
+### ✅ Written (reference-quality, read these to calibrate the bar) — 25 HLD case studies, plus CS Fundamentals and LLD chapters
 
 > [!success] All 23 GoF patterns now have real before/after Go code, plus 5 concurrency patterns GoF never covered
 > Every pattern in [[CS Fundamentals/10 - Design Principles/02 - Design Patterns Cheat Sheet|the Design Patterns Cheat Sheet]] that only had a recognition-level entry (15 of 23) now has a genuine bad-code/good-code pair in one of 3 new category chapters: [[CS Fundamentals/10 - Design Principles/03 - Creational Design Patterns - Full Code Deep Dive|Creational]] (Abstract Factory, Builder, Singleton, Prototype), [[CS Fundamentals/10 - Design Principles/04 - Structural Design Patterns - Full Code Deep Dive|Structural]] (Adapter, Bridge, Decorator, Facade, Flyweight, Proxy), and [[CS Fundamentals/10 - Design Principles/05 - Behavioral Design Patterns - Full Code Deep Dive|Behavioral]] (Memento, Template Method, Visitor, Iterator, Interpreter) — the other 8 patterns keep their existing full LLD case studies, cross-linked not re-taught. Separately added [[CS Fundamentals/10 - Design Principles/06 - Concurrency Patterns in Go|Concurrency Patterns in Go]] (Worker Pool, Pipeline, Fan-out/Fan-in, Context Cancellation, Pub-Sub) — 5 patterns that don't exist in the classic 23 at all, since GoF predates concurrency-first language design, but are genuinely asked in this handbook's Go-based interview prep.
@@ -97,8 +100,8 @@ Chapters are written **one at a time, on request** — say *"write [chapter name
 > [!success] Second gap-audit pass: ACID, SOLID, Design Patterns
 > Added [[CS Fundamentals/03 - Databases/ACID & Isolation Levels|ACID & Isolation Levels]] (previously only a broken glossary stub), [[CS Fundamentals/10 - Design Principles/01 - SOLID Principles|SOLID Principles]], and [[CS Fundamentals/10 - Design Principles/02 - Design Patterns Cheat Sheet|Design Patterns Cheat Sheet]] (all 23 GoF patterns — 8 with full LLD chapter treatment, 15 as cheat-sheet-level entries) — consolidating principles that were previously taught correctly but only scattered inline across individual LLD chapters.
 
-> [!success] Core checklist complete, plus a real gap-audit pass
-> All 20 HLD + all 20 LLD case studies are ✅ (25 HLD folders + 22 LLD folders on disk — bonus chapters push some folder numbers past 20; the checklist tables below are the authoritative status source, not folder numbers). Plus 21 CS Fundamentals chapters (8 added in a gap-audit pass: Authentication & Authorization, Consensus/Raft & Paxos, Sharding & Partitioning, Resilience Patterns, API Gateway, Load Balancing, HTTP Evolution & DNS Resolution, CDN Internals) and 7 bonus-only case studies (Google Calendar HLD+LLD, Google Meet HLD+LLD, Food Delivery HLD, Analytics Aggregation/HyperLogLog HLD, Search Engine HLD — Food Delivery's LLD bonus content was folded into the existing core LLD #13 rather than a new folder). 68 chapters total.
+> [!success] HLD set complete, with a beginner-first playbook added
+> The HLD folder now contains 25 case studies plus the [[HLD/00 - HLD Interview Playbook/HLD Interview Playbook|HLD Interview Playbook]]. The case studies cover APIs, estimation, caching, queues, messaging, feeds, chat, storage, media, geospatial systems, search, booking, payments, coordination, marketplaces, observability, calendars, conferencing, e-commerce, and analytics. The playbook supplies the cross-cutting material that should be learned once and reused across all of them.
 
 > [!tip] Full status lives in the checklist tables below
 > This table shows the earliest chapters as calibration references. The HLD/LLD/CS-Fundamentals checklist tables further down are the authoritative, currently-maintained status tracker — check ✅/🔜 there for anything not listed here.

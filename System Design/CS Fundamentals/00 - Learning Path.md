@@ -10,8 +10,8 @@ status: living-document
 > [!abstract] What this is
 > Not a folder listing — a **dependency-ordered curriculum**. Each tier below assumes you've internalized the tiers above it. This is the fix for "CS Fundamentals feels unordered": read top to bottom, not alphabetically by folder name. By the end, you should be able to understand almost any HLD or LLD chapter in this handbook without a knowledge gap forcing you to backtrack.
 
-> [!success] All 11 tiers complete
-> Tiers 0-10 are fully written — Computer Architecture through Software Design Principles, including Storage Engines, Service Discovery, the full Architecture & Deployment Patterns tier (Monolith vs. Microservices, Event-Driven Architecture, Docker, Kubernetes, Cloud Fundamentals), broader Security, and the full Operational Excellence tier (Observability, Reliability Engineering, Performance Engineering). The folder numbering (00-10, with no remaining gaps) now matches this table exactly.
+> [!success] All 12 tiers complete
+> Tiers 0-11 are fully written — Computer Architecture through Software Design Principles, plus Search Engines, including Storage Engines, Service Discovery, the full Architecture & Deployment Patterns tier (Monolith vs. Microservices, Event-Driven Architecture, Docker, Kubernetes, Cloud Fundamentals), broader Security, and the full Operational Excellence tier (Observability, Reliability Engineering, Performance Engineering). The folder numbering (00-11, with no remaining gaps) now matches this table exactly.
 
 > [!tip] How to use this
 > If you're already confident in a tier (e.g., you've built production systems using TCP/HTTP for years), skim it for the specific framing this book uses and move on — every chapter is written so its "why this matters later" callouts are the fast way to check whether you already have the mental model.
@@ -147,6 +147,14 @@ How you know a system is healthy, how you keep it healthy, and how you make it f
 | 10.4 | [[CS Fundamentals/10 - Design Principles/04 - Structural Design Patterns - Full Code Deep Dive\|Structural Design Patterns]] (full before/after Go code) | ✅ |
 | 10.5 | [[CS Fundamentals/10 - Design Principles/05 - Behavioral Design Patterns - Full Code Deep Dive\|Behavioral Design Patterns]] (full before/after Go code) | ✅ |
 | 10.6 | [[CS Fundamentals/10 - Design Principles/06 - Concurrency Patterns in Go\|Concurrency Patterns in Go]] (not GoF — Worker Pool, Pipeline, Fan-out/Fan-in, Context Cancellation, Pub-Sub) | ✅ |
+
+## Tier 11 — Search Engines
+
+How full-text search actually works — the specialized secondary store behind "search this," autocomplete, and log analytics. Builds directly on Tier 3 (indexes, LSM-style immutable segments) and Tier 6 (sharding, consensus); sits after them because a search engine is best understood as a database projection, not a primary store.
+
+| # | Chapter | Status |
+|---|---|---|
+| 11.1 | [[CS Fundamentals/11 - Search Engines/Full-Text Search - Elasticsearch, OpenSearch and Solr\|Full-Text Search: Elasticsearch, OpenSearch & Solr]] (inverted index, Lucene, BM25, shards/replicas/segments, NRT, the OpenSearch fork, Solr tradeoffs) | ✅ |
 
 ---
 
